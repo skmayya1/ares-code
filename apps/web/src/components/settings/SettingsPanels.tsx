@@ -12,6 +12,7 @@ import {
 import {
   DEFAULT_UNIFIED_SETTINGS,
   type DiffLayout,
+  DefaultDiffView,
   MAX_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   MIN_SIDEBAR_AUTO_SETTLE_AFTER_DAYS,
   type ResponseStreamingMode,
@@ -102,6 +103,13 @@ const TIMESTAMP_FORMAT_LABELS = {
   "12-hour": "12-hour",
   "24-hour": "24-hour",
 } as const;
+
+const DEFAULT_DIFF_VIEW_LABELS = {
+  unstaged: "Uncommitted changes",
+  "latest-turn": "Latest turn",
+  branch: "Branch changes",
+};
+const isDefaultDiffView = Schema.is(DefaultDiffView);
 
 const DIFF_LAYOUT_LABELS: Record<DiffLayout, string> = {
   stacked: "Stacked",
@@ -207,6 +215,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       : []),
     ...(settings.diffIgnoreWhitespace !== DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace
       ? ["Diff whitespace changes"]
+      : []),
+    ...(settings.defaultDiffView !== DEFAULT_UNIFIED_SETTINGS.defaultDiffView
+      ? ["Default diff view"]
       : []),
     ...(settings.diffLayout !== DEFAULT_UNIFIED_SETTINGS.diffLayout ? ["Diff layout"] : []),
     ...(settings.proactivePanelsEnabled !== DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled
@@ -330,6 +341,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       persistComposerContextStrip: DEFAULT_UNIFIED_SETTINGS.persistComposerContextStrip,
       diffFilesCollapsed: DEFAULT_UNIFIED_SETTINGS.diffFilesCollapsed,
       diffIgnoreWhitespace: DEFAULT_UNIFIED_SETTINGS.diffIgnoreWhitespace,
+      defaultDiffView: DEFAULT_UNIFIED_SETTINGS.defaultDiffView,
       diffLayout: DEFAULT_UNIFIED_SETTINGS.diffLayout,
       proactivePanelsEnabled: DEFAULT_UNIFIED_SETTINGS.proactivePanelsEnabled,
       showSkillsInSlashMenu: DEFAULT_UNIFIED_SETTINGS.showSkillsInSlashMenu,
@@ -987,6 +999,39 @@ export function DiffsSettingsPanel() {
   return (
     <SettingsPageContainer>
       <SettingsSection id="diffs" title="Diffs">
+        <SettingsRow
+          {...searchableSetting("default-diff-view")}
+          description="View shown when opening the diff panel. Latest turn falls back to uncommitted changes when no completed turn is available."
+          resetAction={
+            settings.defaultDiffView !== DEFAULT_UNIFIED_SETTINGS.defaultDiffView ? (
+              <SettingResetButton
+                label="default diff view"
+                onClick={() =>
+                  updateSettings({ defaultDiffView: DEFAULT_UNIFIED_SETTINGS.defaultDiffView })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.defaultDiffView}
+              onValueChange={(value) => {
+                if (isDefaultDiffView(value)) updateSettings({ defaultDiffView: value });
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full sm:w-48" aria-label="Default diff view">
+                <SelectValue>{DEFAULT_DIFF_VIEW_LABELS[settings.defaultDiffView]}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {DefaultDiffView.literals.map((value) => (
+                  <SelectItem hideIndicator key={value} value={value}>
+                    {DEFAULT_DIFF_VIEW_LABELS[value]}
+                  </SelectItem>
+                ))}
+              </SelectPopup>
+            </Select>
+          }
+        />
         <SettingsRow
           {...searchableSetting("diff-layout")}
           description="Show diffs stacked or side by side. The toggle in the diff toolbar changes this too."

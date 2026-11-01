@@ -1,10 +1,12 @@
-import { EnvironmentId, ThreadId, TurnItemId } from "@t3tools/contracts";
+import { EnvironmentId, RunId, ThreadId, TurnItemId } from "@t3tools/contracts";
 import * as DateTime from "effect/DateTime";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
 import {
   resolveToolCallDiffTarget,
+  defaultDiffPanelSelection,
+  selectThreadDiffPanelSelection,
   useDiffPanelSessionStore,
   useDiffPanelStore,
 } from "./diffPanelStore";
@@ -16,6 +18,42 @@ describe("diffPanelStore", () => {
       branchBaseRefByThreadKey: {},
     });
     useDiffPanelSessionStore.setState({ collapsedFileKeysByScopeKey: {} });
+  });
+
+  it("uses the configured default only until a thread has an explicit selection", () => {
+    const ref = { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") };
+    const latestRunId = RunId.make("latest");
+    expect(selectThreadDiffPanelSelection({}, ref)).toEqual({ kind: "unstaged" });
+    expect(defaultDiffPanelSelection("unstaged", latestRunId)).toEqual({ kind: "unstaged" });
+    expect(defaultDiffPanelSelection("branch", latestRunId)).toEqual({
+      kind: "branch",
+      baseRef: null,
+    });
+    expect(defaultDiffPanelSelection("latest-turn", undefined)).toEqual({ kind: "unstaged" });
+    const latest = defaultDiffPanelSelection("latest-turn", latestRunId);
+    expect(latest).toEqual({
+      kind: "turn",
+      turnId: latestRunId,
+      filePath: null,
+      revealRequestId: 0,
+    });
+    expect(selectThreadDiffPanelSelection({}, ref, latest)).toEqual(latest);
+    useDiffPanelStore.getState().selectGitScope(ref, "branch");
+    expect(
+      selectThreadDiffPanelSelection(useDiffPanelStore.getState().byThreadKey, ref, latest),
+    ).toEqual({ kind: "branch", baseRef: null });
+  });
+
+  it("uses the configured default again when reopening the diff panel", () => {
+    const ref = { environmentId: EnvironmentId.make("env"), threadId: ThreadId.make("thread") };
+    const store = useDiffPanelStore.getState();
+    store.selectBranchBaseRef(ref, "main");
+    store.resetSelection(ref);
+    const state = useDiffPanelStore.getState();
+    expect(selectThreadDiffPanelSelection(state.byThreadKey, ref)).toEqual({ kind: "unstaged" });
+    const latest = defaultDiffPanelSelection("latest-turn", RunId.make("latest"));
+    expect(selectThreadDiffPanelSelection(state.byThreadKey, ref, latest)).toEqual(latest);
+    expect(state.branchBaseRefByThreadKey[scopedThreadKey(ref)]).toBe("main");
   });
 
   it("keeps a tool call selection independent of checkpoints and allows returning to Git changes", () => {

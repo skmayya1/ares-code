@@ -132,7 +132,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
   const createBrowserSurfaceStable = useStableCallback(createBrowserSurface);
   const addDiffSurface = () => {
     if (!activeThreadRef || !isServerThread || !isGitRepo) return;
-    useDiffPanelStore.getState().selectGitScope(activeThreadRef, "branch");
+    useDiffPanelStore.getState().resetSelection(activeThreadRef);
     useRightPanelStore.getState().open(activeThreadRef, "diff");
     onDiffPanelOpen?.();
   };

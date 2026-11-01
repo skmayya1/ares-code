@@ -34,6 +34,7 @@ import { cn } from "~/lib/utils";
 import {
   resolveToolCallDiffTarget,
   selectThreadDiffPanelSelection,
+  defaultDiffPanelSelection,
   useDiffPanelSessionStore,
   useDiffPanelStore,
 } from "../diffPanelStore";
@@ -210,6 +211,7 @@ export default function DiffPanel({
     diffFilesCollapsed: settings.diffFilesCollapsed,
     diffIgnoreWhitespace: settings.diffIgnoreWhitespace,
     diffLayout: settings.diffLayout,
+    defaultDiffView: settings.defaultDiffView,
     timestampFormat: settings.timestampFormat,
     wordWrap: settings.wordWrap,
   }));
@@ -260,8 +262,18 @@ export default function DiffPanel({
         })
       : null,
   );
+  const turnDiffSummaries = useThreadCheckpointSummaries(routeThreadRef);
+  const orderedTurnDiffSummaries = turnDiffSummaries.toSorted((left, right) => {
+    if (left.checkpointTurnCount !== right.checkpointTurnCount) {
+      return right.checkpointTurnCount - left.checkpointTurnCount;
+    }
+    return right.completedAt.localeCompare(left.completedAt);
+  });
+
+  const latestRunId = orderedTurnDiffSummaries[0]?.runId;
+  const defaultSelection = defaultDiffPanelSelection(settings.defaultDiffView, latestRunId);
   const diffSelection = useDiffPanelStore((state) =>
-    selectThreadDiffPanelSelection(state.byThreadKey, routeThreadRef),
+    selectThreadDiffPanelSelection(state.byThreadKey, routeThreadRef, defaultSelection),
   );
   const toolCallSelection = diffSelection.kind === "tool-call" ? diffSelection : null;
   const isGitSelection = diffSelection.kind === "branch" || diffSelection.kind === "unstaged";
@@ -276,14 +288,6 @@ export default function DiffPanel({
   );
   const toolCallItem = toolCallDetail.data?.item;
   const isGitRepo = gitStatusQuery.data?.isRepo ?? true;
-  const turnDiffSummaries = useThreadCheckpointSummaries(routeThreadRef);
-  const orderedTurnDiffSummaries = turnDiffSummaries.toSorted((left, right) => {
-    if (left.checkpointTurnCount !== right.checkpointTurnCount) {
-      return right.checkpointTurnCount - left.checkpointTurnCount;
-    }
-    return right.completedAt.localeCompare(left.completedAt);
-  });
-
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- rewrites the persisted diff store selection to the latest turn when the selected turn disappears
   useEffect(() => {
     if (!routeThreadRef || diffSelection.kind !== "turn") return;

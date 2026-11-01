@@ -949,6 +949,11 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
     border-bottom-color: transparent;
   }
 
+  [data-preview-panel-mode="inline"] [data-file-browser-panel] [data-surface-subheader] {
+    height: calc(var(--spacing) * 10);
+    min-height: calc(var(--spacing) * 10);
+  }
+
   .chat-content-lane {
     margin-inline: auto;
     width: 100%;

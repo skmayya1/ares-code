@@ -1,7 +1,13 @@
 import type { ThreadStructureVisibleTurnItem } from "@t3tools/client-runtime/state/shell";
 import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import { scopedThreadKey } from "@t3tools/client-runtime/environment";
-import type { RunId, ScopedThreadRef, ThreadId, TurnItemId } from "@t3tools/contracts";
+import type {
+  DefaultDiffView,
+  RunId,
+  ScopedThreadRef,
+  ThreadId,
+  TurnItemId,
+} from "@t3tools/contracts";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
@@ -19,7 +25,7 @@ export type DiffPanelSelection =
   | { kind: "unstaged" }
   | { kind: "turn"; turnId: RunId; filePath: string | null; revealRequestId: number };
 
-const DEFAULT_SELECTION: DiffPanelSelection = { kind: "branch", baseRef: null };
+const DEFAULT_SELECTION: DiffPanelSelection = { kind: "unstaged" };
 
 interface DiffPanelStoreState {
   byThreadKey: Record<string, DiffPanelSelection>;
@@ -29,6 +35,7 @@ interface DiffPanelStoreState {
   selectToolCall: (ref: ScopedThreadRef, target: ToolCallDiffTarget) => void;
   selectTurn: (ref: ScopedThreadRef, turnId: RunId, filePath?: string) => void;
   reconcileTurnSelection: (ref: ScopedThreadRef, availableTurnIds: ReadonlyArray<RunId>) => void;
+  resetSelection: (ref: ScopedThreadRef) => void;
   removeThread: (ref: ScopedThreadRef) => void;
 }
 
@@ -121,6 +128,13 @@ export const useDiffPanelStore = create<DiffPanelStoreState>()(
             },
           };
         }),
+      resetSelection: (ref) =>
+        set((state) => {
+          const threadKey = scopedThreadKey(ref);
+          if (!(threadKey in state.byThreadKey)) return state;
+          const { [threadKey]: _removed, ...byThreadKey } = state.byThreadKey;
+          return { byThreadKey };
+        }),
       removeThread: (ref) =>
         set((state) => {
           const threadKey = scopedThreadKey(ref);
@@ -170,12 +184,24 @@ export const useDiffPanelSessionStore = create<DiffPanelSessionStoreState>()((se
     }),
 }));
 
+export function defaultDiffPanelSelection(
+  view: DefaultDiffView,
+  latestRunId: RunId | undefined,
+): DiffPanelSelection {
+  if (view === "branch") return { kind: "branch", baseRef: null };
+  if (view === "latest-turn" && latestRunId) {
+    return { kind: "turn", turnId: latestRunId, filePath: null, revealRequestId: 0 };
+  }
+  return DEFAULT_SELECTION;
+}
+
 export function selectThreadDiffPanelSelection(
   byThreadKey: Record<string, DiffPanelSelection>,
   ref: ScopedThreadRef | null | undefined,
+  defaultSelection: DiffPanelSelection = DEFAULT_SELECTION,
 ): DiffPanelSelection {
-  if (!ref) return DEFAULT_SELECTION;
-  return byThreadKey[scopedThreadKey(ref)] ?? DEFAULT_SELECTION;
+  if (!ref) return defaultSelection;
+  return byThreadKey[scopedThreadKey(ref)] ?? defaultSelection;
 }
 
 export function resolveToolCallDiffTarget(

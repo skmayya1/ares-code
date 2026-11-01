@@ -82,11 +82,10 @@ function FileSearchField(props: {
   value: string;
 }) {
   return (
-    <InputGroup variant="ghost" className="h-7 min-w-0 flex-1">
+    <InputGroup variant="ghost" className="h-8 min-w-0 flex-1">
       <InputGroupInput
         type="search"
         name={props.name}
-        size="sm"
         value={props.value}
         aria-label={props.ariaLabel}
         placeholder="Search files"

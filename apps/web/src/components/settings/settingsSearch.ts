@@ -542,6 +542,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["collapsed expanded collapse expand files pull request pr code tab"],
   },
   {
+    id: "default-diff-view",
+    title: "Default diff view",
+    to: "/settings/diffs",
+    searchTerms: ["uncommitted latest turn branch changes"],
+  },
+  {
     id: "diff-layout",
     title: "Diff layout",
     to: "/settings/diffs",
