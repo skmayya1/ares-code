@@ -31,6 +31,7 @@ interface ChatShortcutsInput {
   readonly threadFindActive: boolean;
   /** Takes type-to-focus keys and the composer and branch toolbar chords. */
   readonly composerRef: ComposerHandleRef;
+  readonly onBeforeComposerAction?: () => void;
   readonly branchToolbarRef: { readonly current: BranchToolbarHandle | null };
   readonly closeThreadFind: () => void;
   readonly commands: ChatShortcutCommands;
@@ -63,12 +64,14 @@ export function useChatShortcuts(input: ChatShortcutsInput) {
     if (
       !shortcutContext.terminalFocus &&
       !shortcutContext.modelPickerOpen &&
-      shouldTypeToFocusComposer(event) &&
-      input.composerRef.current?.insertTextAtEnd(event.key) === true
+      shouldTypeToFocusComposer(event)
     ) {
-      event.preventDefault();
-      event.stopPropagation();
-      return;
+      input.onBeforeComposerAction?.();
+      if (input.composerRef.current?.insertTextAtEnd(event.key) === true) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
     }
 
     const command = resolveChatShortcutCommand(event, keybindings, input.scriptKeybindings, {
@@ -79,7 +82,9 @@ export function useChatShortcuts(input: ChatShortcutsInput) {
       input.commands[command] ??
       composerShortcutCommands(input.composerRef, input.branchToolbarRef)[command] ??
       input.fallback(command);
-    if (!run || run({ event, terminalFocusOwner }) === false) return;
+    if (!run) return;
+    if (command.startsWith("composer.")) input.onBeforeComposerAction?.();
+    if (run({ event, terminalFocusOwner }) === false) return;
     event.preventDefault();
     event.stopPropagation();
   });

@@ -30,7 +30,6 @@ line to add. Set `T3CODE_CHANNEL=nightly` to install the nightly train, or
 | Start the server and open the web app            | `t3`                                                                    |
 | Start the server without a browser               | `t3 serve`                                                              |
 | Keep it running in the background (macOS, Linux) | `t3 service install` ([details](./background-service.md))               |
-| Move to the newest release                       | `t3 update`                                                             |
 | Reclaim database space                           | `t3 doctor` ([details](./background-service.md#reclaim-database-space)) |
 | Remove it again                                  | `t3 uninstall`                                                          |
 
@@ -57,7 +56,7 @@ cd t3code && vp i && vp run build:desktop
 node apps/server/dist/bin.mjs
 ```
 
-`t3 update` and the background service do not apply to a server run this way;
+The background service does not apply to a server run this way;
 update it with `git pull` and a rebuild.
 
 ## Desktop app
@@ -98,7 +97,7 @@ Apply the change with `sudo nixos-rebuild switch`. For Home Manager, add
 Update a profile installation with `nix profile upgrade t3code`. For NixOS or
 Home Manager, update your configuration's nixpkgs input or channel and rebuild.
 Nix manages both the desktop app and the bundled
-`t3` command; use Nix to update them instead of the in-app updater or `t3 update`.
+`t3` command; use Nix to update them.
 
 ### The `t3` command
 
@@ -135,7 +134,7 @@ Install T3 Code from the
 [App Store](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824) or
 [Google Play](https://play.google.com/store/apps/details?id=com.t3tools.t3code).
 The phone connects to a server on another machine. Follow
-[remote access](./remote-access.md) to link it through T3 Connect or a pairing URL.
+[remote access](./remote-access.md) to link it with a pairing URL.
 
 Store links and QR codes are also available in **Settings → About → Mobile app**
 on web and desktop. The store apps work with both stable and Nightly servers. Test builds are optional:

@@ -14,6 +14,7 @@ import { useEnvironmentThemeDefinitions } from "../../hooks/useEnvironmentTheme"
 import { readThemeHalvesRaw } from "../../hooks/useTheme";
 import { cn } from "../../lib/utils";
 import {
+  BUILT_IN_THEME_DEFINITIONS,
   getThemeDefinition,
   singleAppearanceOf,
   getThemeModes,
@@ -22,11 +23,6 @@ import {
   type ThemeAppearance,
   type ThemeDefinition,
   type ThemeHalves,
-  T3_CHAT_THEME,
-  EMBER_THEME,
-  GROVE_THEME,
-  IRIS_THEME,
-  OCEAN_THEME,
 } from "../../themePalette";
 import {
   AlertDialog,
@@ -53,14 +49,6 @@ import {
   type ThemeMode,
 } from "./ThemePreviewCircles";
 import { ThemeWireframe } from "./ThemeWireframe";
-
-const MAINTAINER_THEMES: ReadonlyArray<ThemeDefinition> = [
-  T3_CHAT_THEME,
-  GROVE_THEME,
-  OCEAN_THEME,
-  EMBER_THEME,
-  IRIS_THEME,
-];
 
 function collectionVariantLabels(themes: ReadonlyArray<ThemeDefinition>): ReadonlyArray<string> {
   if (themes.length === 0) return [];
@@ -740,7 +728,7 @@ export function ThemeLibrary({
             theme={standardTheme}
           />
         ))}
-        {MAINTAINER_THEMES.map((maintainerTheme) => {
+        {BUILT_IN_THEME_DEFINITIONS.map((maintainerTheme) => {
           const card = getThemeCardDefinition(maintainerTheme);
           return (
             <ThemeLibraryCard

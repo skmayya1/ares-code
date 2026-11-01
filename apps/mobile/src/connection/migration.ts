@@ -2,8 +2,6 @@ import {
   BearerConnectionCredential,
   BearerConnectionProfile,
   BearerConnectionRegistration,
-  RelayConnectionRegistration,
-  RelayConnectionTarget,
   BearerConnectionTarget,
 } from "@t3tools/client-runtime/connection";
 import {
@@ -48,19 +46,11 @@ function migrateConnection(
   document: ConnectionCatalogDocument,
   connection: typeof LegacySavedRemoteConnection.Type,
 ): ConnectionCatalogDocument {
-  if (isRelayManaged(connection)) {
-    return registerConnectionInCatalog(
-      document,
-      new RelayConnectionRegistration({
-        target: new RelayConnectionTarget({
-          environmentId: connection.environmentId,
-          label: connection.environmentLabel,
-        }),
-      }),
-    );
-  }
-
-  if (connection.bearerToken === null || connection.bearerToken.trim() === "") {
+  if (
+    isRelayManaged(connection) ||
+    connection.bearerToken === null ||
+    connection.bearerToken.trim() === ""
+  ) {
     return document;
   }
 

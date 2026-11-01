@@ -894,3 +894,29 @@ describe("Usage shortcuts", () => {
     );
   });
 });
+
+it("selects workspace tabs with Control digit keys on macOS and Windows", () => {
+  for (const [index, key] of [..."123456789"].entries()) {
+    for (const platform of ["MacIntel", "Win32"]) {
+      const shortcut = event({
+        key,
+        code: `Digit${index + 1}`,
+        ctrlKey: true,
+      });
+      assert.equal(
+        resolveShortcutCommand(shortcut, DEFAULT_RESOLVED_KEYBINDINGS, {
+          platform,
+          context: { rightPanelOpen: true },
+        }),
+        `rightPanel.jump.${index + 1}`,
+      );
+      assert.equal(
+        resolveShortcutCommand(shortcut, DEFAULT_RESOLVED_KEYBINDINGS, {
+          platform,
+          context: { rightPanelOpen: false },
+        }),
+        null,
+      );
+    }
+  }
+});

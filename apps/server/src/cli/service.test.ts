@@ -12,7 +12,7 @@ import { Command } from "effect/cli";
 import { afterEach, vi } from "vite-plus/test";
 
 import packageJson from "../../package.json" with { type: "json" };
-import * as BootService from "../cloud/bootService.ts";
+import * as BootService from "../service/bootService.ts";
 import {
   offerServiceDuringOnboarding,
   recoverServiceOnboardingOffer,
@@ -60,72 +60,68 @@ function makeTestService(
 }
 
 it.layer(Layer.mergeAll(NodeServices.layer, NetService.layer))("service commands", (it) => {
-  it.effect.each(["install", "update"] as const)(
-    "%s refuses a downgrade before changing the service",
-    (command) =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
-        const { service, installOptions } = makeTestService(newerServiceStatus);
-        vi.spyOn(BootService, "layer").mockReturnValue(
-          Layer.succeed(BootService.BootService, service),
-        );
+  it.effect("install refuses a downgrade before changing the service", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
+      const { service, installOptions } = makeTestService(newerServiceStatus);
+      vi.spyOn(BootService, "layer").mockReturnValue(
+        Layer.succeed(BootService.BootService, service),
+      );
 
-        const error = yield* Command.runWith(serviceCommand, { version: packageJson.version })([
-          command,
-          "--base-dir",
-          baseDir,
-        ]).pipe(
-          Effect.provideService(HostProcess.Environment, {}),
-          Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }))),
-          Effect.flip,
-        );
+      const error = yield* Command.runWith(serviceCommand, { version: packageJson.version })([
+        "install",
+        "--base-dir",
+        baseDir,
+      ]).pipe(
+        Effect.provideService(HostProcess.Environment, {}),
+        Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} }))),
+        Effect.flip,
+      );
 
-        expect(error).toMatchObject({
-          _tag: "BootServiceDowngradeRefusedError",
-          installedVersion: "999.0.0",
-          targetVersion: packageJson.version,
-        });
-        expect(installOptions).toEqual([]);
-      }),
+      expect(error).toMatchObject({
+        _tag: "BootServiceDowngradeRefusedError",
+        installedVersion: "999.0.0",
+        targetVersion: packageJson.version,
+      });
+      expect(installOptions).toEqual([]);
+    }),
   );
 
   // regression: #13239 a stale nvm-installed CLI reported "already using" its own version
-  it.effect.each(["install", "update"] as const)(
-    "%s names the CLI that found nothing to change",
-    (command) =>
-      Effect.gen(function* () {
-        const fs = yield* FileSystem.FileSystem;
-        const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
-        const { service, installOptions } = makeTestService(status);
-        vi.spyOn(BootService, "layer").mockReturnValue(
-          Layer.succeed(BootService.BootService, service),
-        );
-        const node = "/home/me/.nvm/versions/node/v26.8.2/bin/node";
-        const script = "/home/me/.nvm/versions/node/v26.8.2/lib/node_modules/t3/dist/bin.mjs";
+  it.effect("install names the CLI that found nothing to change", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const baseDir = yield* fs.makeTempDirectoryScoped({ prefix: "t3-service-cli-test-" });
+      const { service, installOptions } = makeTestService(status);
+      vi.spyOn(BootService, "layer").mockReturnValue(
+        Layer.succeed(BootService.BootService, service),
+      );
+      const node = "/home/me/.nvm/versions/node/v26.8.2/bin/node";
+      const script = "/home/me/.nvm/versions/node/v26.8.2/lib/node_modules/t3/dist/bin.mjs";
 
-        const output = yield* Command.runWith(serviceCommand, { version: packageJson.version })([
-          command,
-          "--base-dir",
-          baseDir,
-        ]).pipe(
-          Effect.andThen(TestConsole.logLines),
-          Effect.map((lines) => lines.join("\n")),
-          Effect.provideService(HostProcess.Environment, {}),
-          Effect.provideService(HostProcess.IsExecutable, false),
-          Effect.provideService(HostProcess.ExecutablePath, node),
-          Effect.provideService(HostProcess.Arguments, [node, script, "service", command]),
-          Effect.provide(
-            Layer.mergeAll(
-              ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
-              Layer.fresh(TestConsole.layer),
-            ),
+      const output = yield* Command.runWith(serviceCommand, { version: packageJson.version })([
+        "install",
+        "--base-dir",
+        baseDir,
+      ]).pipe(
+        Effect.andThen(TestConsole.logLines),
+        Effect.map((lines) => lines.join("\n")),
+        Effect.provideService(HostProcess.Environment, {}),
+        Effect.provideService(HostProcess.IsExecutable, false),
+        Effect.provideService(HostProcess.ExecutablePath, node),
+        Effect.provideService(HostProcess.Arguments, [node, script, "service", "install"]),
+        Effect.provide(
+          Layer.mergeAll(
+            ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })),
+            Layer.fresh(TestConsole.layer),
           ),
-        );
-        expect(output).toContain(`t3@${packageJson.version}`);
-        expect(output).toContain(script);
-        expect(installOptions).toEqual([]);
-      }),
+        ),
+      );
+      expect(output).toContain(`t3@${packageJson.version}`);
+      expect(output).toContain(script);
+      expect(installOptions).toEqual([]);
+    }),
   );
 });
 

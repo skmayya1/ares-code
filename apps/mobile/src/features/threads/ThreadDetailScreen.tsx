@@ -1586,7 +1586,6 @@ function ThreadDetailBody(props: ThreadDetailScreenProps) {
                         contentMaxWidth={contentMaxWidth}
                         draftControls={props.draftMode?.controls}
                         connectionState={props.connectionStateLabel}
-                        environmentLabel={props.environmentLabel}
                         selectedThread={props.selectedThread}
                         hasCompactableConversation={
                           hasCompactableConversation && !props.isCompacting

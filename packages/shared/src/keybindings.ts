@@ -8,6 +8,7 @@ import {
   type ResolvedKeybindingRule,
   type ResolvedKeybindingsConfig,
   THREAD_JUMP_KEYBINDING_COMMANDS,
+  RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS,
 } from "@t3tools/contracts";
 
 export interface ShortcutEventLike {
@@ -219,6 +220,11 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+shift+s", command: "thread.settle", when: "!terminalFocus" },
   { key: "mod+shift+p", command: "thread.pin", when: "!terminalFocus" },
   { key: "mod+z", command: "thread.undo", when: "!terminalFocus && !editableFocus" },
+  ...RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS.map((command, index) => ({
+    key: `ctrl+${index + 1}`,
+    command,
+    when: "rightPanelOpen && !modelPickerOpen",
+  })),
   ...THREAD_JUMP_KEYBINDING_COMMANDS.map((command, index) => ({
     key: `mod+${index + 1}`,
     command,

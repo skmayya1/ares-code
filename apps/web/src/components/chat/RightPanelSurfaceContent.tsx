@@ -79,6 +79,8 @@ export function RightPanelSurfaceContent(props: {
   const { surface, threadRef, visible } = props;
   if (surface === null) return null;
   switch (surface.kind) {
+    case "chat":
+      return null;
     case "preview":
       return (
         <Suspense fallback={null}>

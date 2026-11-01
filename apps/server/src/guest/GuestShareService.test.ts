@@ -36,7 +36,6 @@ import {
   sweepStalePendingAttachments,
 } from "../attachmentStore.ts";
 import * as ServerSecretStore from "../auth/ServerSecretStore.ts";
-import { CloudManagedEndpointRuntime } from "../cloud/ManagedEndpointRuntime.ts";
 import * as ServerConfig from "../config.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import { CodexProviderCapabilitiesV2 } from "../orchestration-v2/Adapters/CodexAdapterV2.ts";
@@ -74,15 +73,9 @@ const layerOrchestration = Layer.mergeAll(
   ),
 );
 
-// The Connect hostname the fake tunnel reports. Tests set it to null to simulate an unlink.
+// The host guest links point at. Tests set it to null to simulate losing it.
 const hostname = Ref.makeUnsafe<string | null>("env.t3.test");
-const layerConnect = Layer.mock(CloudManagedEndpointRuntime)({
-  inspectConnector: Effect.map(Ref.get(hostname), (value) => ({
-    readyConnections: 1,
-    hostname: value,
-    protocol: "http2",
-  })),
-});
+const layerHost = Layer.succeed(GuestShareService.GuestShareHost, Ref.get(hostname));
 const layerProviders = Layer.mock(ProviderRegistry.ProviderRegistry)({
   getProviders: Effect.succeed([]),
 });
@@ -122,8 +115,6 @@ const layerAnalytics = Layer.effectContext(
         AnalyticsService.AnalyticsService.of({
           record: (event, properties) =>
             Ref.update(recorded, (events) => [...events, { event, ...properties }]),
-          flush: Effect.void,
-          recordOwners: () => Effect.void,
         }),
       ),
     );
@@ -137,7 +128,7 @@ const layerTest = GuestShareService.layer.pipe(
   ),
   Layer.provide(layerProviders),
   Layer.provideMerge(ServerSettings.layerTest({ guestSharingEnabled: true })),
-  Layer.provide(layerConnect),
+  Layer.provide(layerHost),
   Layer.provideMerge(layerAnalytics),
   Layer.provide(ServerSecretStore.layer),
   Layer.provideMerge(layerConfig),

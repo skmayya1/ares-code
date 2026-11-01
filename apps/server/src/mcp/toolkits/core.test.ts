@@ -340,8 +340,6 @@ it.effect("records only failed calls of tools that hand off no work", () => {
                 Deferred.succeed(recorded, { event, properties: properties ?? {} }).pipe(
                   Effect.asVoid,
                 ),
-              flush: Effect.void,
-              recordOwners: () => Effect.void,
             }),
           ),
         ),

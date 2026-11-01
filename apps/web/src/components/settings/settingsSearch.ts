@@ -36,7 +36,6 @@ export type SettingsPath =
   | "/settings/secrets"
   | "/settings/maintenance"
   | "/settings/labs"
-  | "/settings/about"
   | "/settings/archived";
 
 export type SettingsSearchScope =
@@ -59,14 +58,12 @@ export interface SettingsSearchItem {
   readonly windowsOnly?: boolean;
   readonly releaseChannelOnly?: boolean;
   readonly secretsFeatureOnly?: boolean;
-  readonly cloudOnly?: boolean;
   readonly environmentOnly?: boolean;
   readonly providerSettingsOnly?: boolean;
   readonly macProviderSettingsOnly?: boolean;
   readonly localBackendManagementOnly?: boolean;
   readonly localEnvironmentOnly?: boolean;
   readonly wslAvailableOnly?: boolean;
-  readonly managedTunnelOnly?: boolean;
   readonly peerLinksOnly?: boolean;
   readonly secondary?: boolean;
   readonly requiresThreadAutoSettlement?: boolean;
@@ -74,14 +71,12 @@ export interface SettingsSearchItem {
 
 export interface SettingsSearchAvailability {
   readonly localEnvironmentDisabled?: boolean;
-  readonly hasCloudPublicConfig: boolean;
   readonly hasEnvironment: boolean;
   readonly hasProviderSettingsEnvironment: boolean;
   readonly hasMacProviderSettingsEnvironment: boolean;
   readonly canManageLocalBackend: boolean;
   readonly isWslSettingsRowVisible: boolean;
   readonly hasThreadAutoSettlement: boolean;
-  readonly managedTunnelActive?: boolean;
   readonly hasPeerLinkHost?: boolean;
 }
 
@@ -106,7 +101,6 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/secrets": "Secrets",
   "/settings/maintenance": "Maintenance",
   "/settings/labs": "Labs",
-  "/settings/about": "About",
   "/settings/archived": "Archive",
 };
 
@@ -150,7 +144,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
   },
   {
     heading: null,
-    paths: ["/settings/maintenance", "/settings/labs", "/settings/about", "/settings/archived"],
+    paths: ["/settings/maintenance", "/settings/labs", "/settings/archived"],
   },
 ];
 
@@ -456,13 +450,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["beta boring sidebar folder rows multiline branch pull request details"],
   },
   {
-    id: "guest-links",
-    title: "Guest links",
-    to: "/settings/labs",
-    scope: "environment",
-    searchTerms: ["beta share guest invite link teammate watch t3 connect tunnel"],
-  },
-  {
     id: "linked-environments-beta",
     title: "Linked environments",
     to: "/settings/labs",
@@ -683,38 +670,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["generated thread titles prompt custom style naming rename regenerate"],
   },
   {
-    id: "app-version",
-    title: "Version",
-    to: "/settings/about",
-    searchTerms: ["about check for updates download install upgrade release"],
-  },
-  {
-    id: "update-track",
-    title: "Update track",
-    to: "/settings/about",
-    searchTerms: ["release channel stable latest nightly prerelease"],
-    releaseChannelOnly: true,
-  },
-  {
-    id: "cli-command",
-    title: "t3 command",
-    to: "/settings/about",
-    searchTerms: ["cli terminal shell path install command line"],
-    desktopOnly: true,
-  },
-  {
-    id: "mobile-app",
-    title: "Mobile app",
-    to: "/settings/about",
-    searchTerms: ["phone tablet iPhone iPad iOS Android App Store Google Play QR"],
-  },
-  {
-    id: "privacy-policy",
-    title: "Privacy policy",
-    to: "/settings/about",
-    searchTerms: ["telemetry analytics usage data tracking legal opt out"],
-  },
-  {
     id: "telemetry-export",
     title: "OpenTelemetry export",
     to: "/settings/diagnostics",
@@ -727,11 +682,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     title: "Diagnostics",
     to: "/settings/maintenance",
     searchTerms: ["logs traces processes resource history failures spans cpu memory"],
-  },
-  {
-    id: "open-source-licenses",
-    title: "Open source licenses",
-    to: "/settings/about",
   },
   {
     id: "legacy-plan-mode",
@@ -1086,35 +1036,6 @@ export const SETTINGS_SEARCH_ITEMS = [
     wslAvailableOnly: true,
   },
   {
-    id: "t3-connect",
-    localEnvironmentOnly: true,
-    title: "T3 Connect",
-    to: "/settings/access",
-    targetId: "connections-environment",
-    searchTerms: ["managed tunnel cloud other devices remote tunnels limit t3 chat"],
-    desktopOnly: true,
-    cloudOnly: true,
-  },
-  {
-    id: "hold-webhooks-while-offline",
-    localEnvironmentOnly: true,
-    title: "Hold webhooks while offline",
-    to: "/settings/access",
-    targetId: "connections-environment",
-    searchTerms: ["webhook automations offline queue mailbox t3 connect"],
-    cloudOnly: true,
-    managedTunnelOnly: true,
-  },
-  {
-    id: "publish-agent-activity",
-    localEnvironmentOnly: true,
-    title: "Publish agent activity",
-    to: "/settings/access",
-    targetId: "connections-environment",
-    searchTerms: ["mobile push notifications live activities cloud tunnel"],
-    cloudOnly: true,
-  },
-  {
     id: "connections-environment",
     title: "This machine",
     to: "/settings/access",
@@ -1200,7 +1121,6 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/scheduled-tasks": null,
   "/settings/maintenance": null,
   "/settings/labs": null,
-  "/settings/about": null,
   "/settings/archived": "project-defaults",
 };
 
@@ -1221,7 +1141,6 @@ const MOVED_SECTION_ANCHORS: Readonly<Record<string, SettingsPath>> = {
   "authorized-clients": "/settings/access",
   "legacy-features": "/settings/labs",
   "text-generation": "/settings/threads",
-  about: "/settings/about",
 };
 
 /** Where an old settings link now lives. Its anchor finds the page its row moved to. */
@@ -1317,7 +1236,6 @@ export function filterAvailableSettingsSearchItems(
   const items: ReadonlyArray<SettingsSearchItem> = SETTINGS_SEARCH_ITEMS;
   return items.filter(
     (item) =>
-      (!item.cloudOnly || availability.hasCloudPublicConfig) &&
       (!item.environmentOnly || availability.hasEnvironment) &&
       (!item.providerSettingsOnly || availability.hasProviderSettingsEnvironment) &&
       (!item.macProviderSettingsOnly || availability.hasMacProviderSettingsEnvironment) &&
@@ -1325,7 +1243,6 @@ export function filterAvailableSettingsSearchItems(
       (!item.localEnvironmentOnly || !availability.localEnvironmentDisabled) &&
       (!item.wslAvailableOnly || availability.isWslSettingsRowVisible) &&
       (!item.requiresThreadAutoSettlement || availability.hasThreadAutoSettlement) &&
-      (!item.managedTunnelOnly || availability.managedTunnelActive === true) &&
       (!item.peerLinksOnly || availability.hasPeerLinkHost === true),
   );
 }

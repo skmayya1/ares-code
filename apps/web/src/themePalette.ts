@@ -334,7 +334,7 @@ function getEnvironmentThemes(): ReadonlyArray<ThemeDefinition> {
 }
 
 export function isReservedThemeId(themeId: string): boolean {
-  return RESERVED_THEME_IDS.has(themeId);
+  return themeId === DEFAULT_THEME_ID || RESERVED_THEME_IDS.has(themeId);
 }
 
 export function getStoredCustomThemeCollection(
@@ -1170,7 +1170,81 @@ export function updateThemeColorFamily(
   }
 }
 
-const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = BUILT_IN_THEMES;
+export const DEFAULT_THEME_ID = "notion";
+
+export const NOTION_THEME: ThemeDefinition = {
+  id: "notion",
+  label: "Notion",
+  appearance: "dark",
+  colors: {
+    canvas: "oklch(0.213423 0 0)",
+    chrome: "oklch(0.213423 0 0)",
+    toolbar: "oklch(0.213423 0 0)",
+    toolbarForeground: "oklch(0.92494 0 0)",
+    toolbarBorder: "oklch(0.336799 0 0)",
+    toolbarControl: "oklch(0.26448 0 0)",
+    toolbarControlForeground: "oklch(0.92494 0 0)",
+    toolbarControlHover: "oklch(0.305191 0 0)",
+    surface: "oklch(0.26448 0 0)",
+    surfaceRaised: "oklch(0.26448 0 0)",
+    surfaceOverlay: "oklch(0.305191 0 0)",
+    text: "oklch(0.92494 0 0)",
+    textMuted: "oklch(0.689488 0 0)",
+    border: "oklch(0.336799 0 0)",
+    input: "oklch(0.26448 0 0)",
+    focus: "oklch(0.60576 0.167377 252.702)",
+    accent: "oklch(0.60576 0.167377 252.702)",
+    accentForeground: "oklch(1 0 0)",
+    secondary: "oklch(0.26448 0 0)",
+    secondaryForeground: "oklch(0.92494 0 0)",
+    muted: "oklch(0.26448 0 0)",
+    mutedForeground: "oklch(0.689488 0 0)",
+    placeholder: "oklch(0.541706 0 0)",
+    secondaryLabel: "oklch(0.689488 0 0)",
+    iconMuted: "oklch(0.596489 0 0)",
+    error: "oklch(0.721773 0.172821 26.378)",
+    errorForeground: "oklch(0.721773 0.172821 26.378)",
+    errorSurface: "oklch(0.280367 0.021737 27.835)",
+    warning: "oklch(0.656912 0.128858 57.806)",
+    warningForeground: "oklch(0.686526 0.119023 79.599)",
+    warningSurface: "oklch(0.306794 0.026951 78.476)",
+    update: "oklch(0.581777 0.137644 258.356)",
+    updateForeground: "oklch(0.663969 0.10075 238.148)",
+    updateSurface: "oklch(0.270382 0.015709 232.433)",
+    accentSurface: "oklch(0.26448 0 0)",
+    accentSurfaceForeground: "oklch(0.92494 0 0)",
+    messageSurface: "oklch(0.26448 0 0)",
+    messageForeground: "oklch(0.92494 0 0)",
+    messageAction: "oklch(0.60576 0.167377 252.702)",
+    messageActionForeground: "oklch(1 0 0)",
+    messageActionHover: "oklch(0.536159 0.151428 253.238)",
+    codeBackground: "oklch(0.26448 0 0)",
+    codeForeground: "oklch(0.92494 0 0)",
+    searchMatchBackground: "oklch(0.55 0.1 85)",
+    searchMatchForeground: "oklch(0.970151 0 0)",
+    searchMatchActiveBackground: "oklch(0.774202 0.151946 74.331)",
+    searchMatchActiveForeground: "oklch(0.216164 0.028283 77.423)",
+    sidebar: "oklch(0.243535 0 0)",
+    sidebarForeground: "oklch(0.92494 0 0)",
+    sidebarMutedForeground: "oklch(0.689488 0 0)",
+    sidebarControlSurface: "oklch(0.243535 0 0)",
+    sidebarRowHover: "oklch(0.305191 0 0)",
+    sidebarRowActive: "oklch(0.305191 0 0)",
+    sidebarRowSelected: "oklch(0.26448 0 0)",
+    sidebarBorder: "oklch(0.336799 0 0)",
+    terminalBackground: "oklch(0.213423 0 0)",
+    terminalForeground: "oklch(0.92494 0 0)",
+    terminalCursor: "oklch(0.92494 0 0)",
+    terminalSelection: "oklch(0.336799 0 0)",
+    terminalScrollbar: "oklch(0.26448 0 0)",
+    terminalScrollbarHover: "oklch(0.336799 0 0)",
+  },
+};
+
+export const BUILT_IN_THEME_DEFINITIONS: ReadonlyArray<ThemeDefinition> = [
+  ...BUILT_IN_THEMES,
+  NOTION_THEME,
+];
 
 export function getThemeDefinition(theme: ThemePreference): ThemeDefinition | null {
   const themeId = themeIdFromPreference(theme);

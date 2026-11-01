@@ -7,8 +7,8 @@ import { Command, Flag, GlobalFlag, Prompt } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
 import packageJson from "../../package.json" with { type: "json" };
-import * as BootService from "../cloud/bootService.ts";
-import { compareExactServiceVersions } from "../cloud/serviceProtocol.ts";
+import * as BootService from "../service/bootService.ts";
+import { compareExactServiceVersions } from "../service/serviceProtocol.ts";
 import type * as ServerConfig from "../config.ts";
 import * as ProcessRunner from "../processRunner.ts";
 import { projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
@@ -90,7 +90,7 @@ function formatServiceStatus(status: BootService.BootServiceStatus, cliVersion: 
       `  Unit: ${status.unitPath}`,
       `  Logs: ${status.logPath}`,
       ...problems,
-      `  Next: Run \`t3 update ${installedVersion}\` to match it, or pass \`--allow-downgrade\` to \`t3 service install\` explicitly.`,
+      `  Next: Install t3@${installedVersion} to match it, or pass \`--allow-downgrade\` to \`t3 service install\` explicitly.`,
     ].join("\n");
   }
   return [
@@ -139,32 +139,9 @@ const serviceInstallCommand = Command.make("install", serviceReconcileFlags).pip
   ),
 );
 
-const serviceUpdateCommand = Command.make("update", serviceReconcileFlags).pipe(
-  Command.withDescription("Deprecated. Run `t3 update` to move to a newer release."),
-  Command.unlisted,
-  Command.withHandler((flags) =>
-    runServiceCommand(
-      flags,
-      Effect.gen(function* () {
-        yield* Console.log(
-          "`t3 service update` is deprecated: run `t3 update` to move to a newer release, or `t3 service install` to repair the service. Repairing now.",
-        );
-        const result = yield* reconcileService({ allowDowngrade: flags.allowDowngrade });
-        if (!result.changed) {
-          yield* Console.log(
-            `T3 Code service is already using t3@${packageJson.version} (${yield* resolveEntryPath}).`,
-          );
-          return;
-        }
-        yield* Console.log(formatServiceChange(result));
-      }),
-    ),
-  ),
-);
-
 const serviceRestartCommand = Command.make("restart", projectLocationFlags).pipe(
   Command.withDescription(
-    "Restart the background service. Picks up a version installed by `t3 update` that was not restarted at the time.",
+    "Restart the background service. Picks up a newly installed version that was not restarted at the time.",
   ),
   Command.withHandler((flags) =>
     runServiceCommand(
@@ -249,9 +226,9 @@ export const offerServiceDuringOnboarding = Effect.gen(function* () {
         ? "The installed T3 Code service needs an update or repair. Update it now?"
         : platform === "darwin"
           ? "Run T3 Code in the background whenever you log in to this Mac? " +
-            "It stays reachable through T3 Connect while you are logged in."
+            "It stays reachable from your other devices while you are logged in."
           : "Run T3 Code in the background whenever this machine boots? " +
-            "It stays reachable through T3 Connect even after you log out.",
+            "It stays reachable from your other devices even after you log out.",
       initial: true,
     }),
   );
@@ -305,6 +282,5 @@ export const serviceCommand = Command.make("service").pipe(
     serviceRestartCommand,
     serviceUninstallCommand,
     serviceStatusCommand,
-    serviceUpdateCommand,
   ]),
 );

@@ -39,6 +39,38 @@ async function reloadRightPanelStore() {
 }
 
 describe("rightPanelStore", () => {
+  it("keeps one chat tab per thread through reload and reopen", async () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "chat");
+    store.open(refA, "diff");
+    store.open(refA, "chat");
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refB).surfaces,
+    ).toEqual([]);
+
+    await reloadRightPanelStore();
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA),
+    ).toMatchObject({
+      isOpen: true,
+      activeSurfaceId: "chat",
+      surfaces: [
+        { id: "chat", kind: "chat" },
+        { id: "diff", kind: "diff" },
+      ],
+    });
+
+    store.closeSurface(refA, "chat");
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("diff");
+    await reopenClosedView(useClosedViewStore.getState().entries[0]!, {
+      openPreview: async () => {
+        throw new Error("Chat must not open a browser session");
+      },
+      workspaceAvailable: true,
+    });
+    expect(selectActiveRightPanel(useRightPanelStore.getState().byThreadKey, refA)).toBe("chat");
+  });
+
   it("records single and bulk tab closes, newest first", () => {
     const store = useRightPanelStore.getState();
     const pr = pullRequestSurface({

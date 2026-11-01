@@ -27,7 +27,7 @@ export interface ProviderDimensions {
  * user-defined, so only the driver kind is reported. The model is reported
  * only when it comes from a vendor catalog and is not a user-added custom model.
  */
-export function providerDimensions(
+function providerDimensions(
   providers: ReadonlyArray<ServerProvider>,
   selection: Pick<ModelSelection, "instanceId" | "model">,
 ): ProviderDimensions {
@@ -61,7 +61,7 @@ const oneOf = (value: string | undefined, allowed: ReadonlyArray<string>) =>
  * Whether two resolved providers differ. Unresolved selections compare as
  * unknown rather than as a cross-provider handoff.
  */
-export const crossProvider = (caller: string, target: string) =>
+const crossProvider = (caller: string, target: string) =>
   caller === "unknown" || target === "unknown" ? undefined : caller !== target;
 
 const defined = (entries: Readonly<Record<string, unknown>>) =>

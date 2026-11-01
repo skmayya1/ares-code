@@ -130,7 +130,7 @@ export const GlassOpacity = Schema.Int.check(
   }),
 );
 export type GlassOpacity = typeof GlassOpacity.Type;
-const DEFAULT_GLASS_OPACITY: GlassOpacity = 80;
+const DEFAULT_GLASS_OPACITY: GlassOpacity = 75;
 
 export const MIN_APPEARANCE_CONTRAST = 50;
 export const MAX_APPEARANCE_CONTRAST = 200;
@@ -138,7 +138,7 @@ export const AppearanceContrast = Schema.Int.check(
   Schema.isBetween({ minimum: MIN_APPEARANCE_CONTRAST, maximum: MAX_APPEARANCE_CONTRAST }),
 );
 export type AppearanceContrast = typeof AppearanceContrast.Type;
-const DEFAULT_APPEARANCE_CONTRAST: AppearanceContrast = 100;
+const DEFAULT_APPEARANCE_CONTRAST: AppearanceContrast = 80;
 export const MIN_PANEL_ANIMATION_DURATION_MS = 0;
 export const MAX_PANEL_ANIMATION_DURATION_MS = 400;
 export const PanelAnimationDurationMs = Schema.Int.check(
@@ -156,7 +156,7 @@ export const InterfaceFontSize = Schema.Int.check(
   Schema.isBetween({ minimum: MIN_INTERFACE_FONT_SIZE, maximum: MAX_INTERFACE_FONT_SIZE }),
 );
 export type InterfaceFontSize = typeof InterfaceFontSize.Type;
-export const DEFAULT_INTERFACE_FONT_SIZE: InterfaceFontSize = 16;
+export const DEFAULT_INTERFACE_FONT_SIZE: InterfaceFontSize = 14;
 
 export const MIN_PROMPT_FONT_SIZE = 12;
 export const MAX_PROMPT_FONT_SIZE = 20;
@@ -164,7 +164,7 @@ export const PromptFontSize = Schema.Int.check(
   Schema.isBetween({ minimum: MIN_PROMPT_FONT_SIZE, maximum: MAX_PROMPT_FONT_SIZE }),
 );
 export type PromptFontSize = typeof PromptFontSize.Type;
-export const DEFAULT_PROMPT_FONT_SIZE: PromptFontSize = 14;
+export const DEFAULT_PROMPT_FONT_SIZE: PromptFontSize = 15;
 
 export const MIN_CODE_FONT_SIZE = 10;
 export const MAX_CODE_FONT_SIZE = 18;
@@ -353,7 +353,7 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   inAppNotificationsEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   diffColorScheme: DiffColorScheme.pipe(
-    Schema.withDecodingDefault(Effect.succeed("red-green" as const)),
+    Schema.withDecodingDefault(Effect.succeed("blue-orange" as const)),
   ),
   chatWidth: ChatWidth.pipe(Schema.withDecodingDefault(Effect.succeed("comfortable" as const))),
   effortDisplay: EffortDisplay.pipe(Schema.withDecodingDefault(Effect.succeed("label" as const))),

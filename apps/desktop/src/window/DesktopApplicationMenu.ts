@@ -163,7 +163,6 @@ export const make = Effect.gen(function* () {
       template.push({
         label: environment.displayName,
         submenu: [
-          { role: "about", label: `About ${environment.displayName}` },
           {
             label: "Check for Updates...",
             click: checkForUpdatesClick,

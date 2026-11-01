@@ -4,6 +4,7 @@ import { safeErrorLogAttributes } from "@t3tools/client-runtime/errors";
 import * as Schema from "effect/Schema";
 import { useSyncExternalStore } from "react";
 import {
+  DEFAULT_THEME_ID,
   applyThemePalette,
   CUSTOM_THEMES_STORAGE_KEY,
   invalidateCustomThemes,
@@ -41,11 +42,11 @@ type DesktopThemeBridge = Pick<DesktopBridge, "setTheme">;
 const STORAGE_KEY = "t3code:theme";
 const MEDIA_QUERY = "(prefers-color-scheme: dark)";
 const DEFAULT_THEME_SNAPSHOT: ThemeSnapshot = {
-  theme: "system",
-  resolvedTheme: "light",
+  theme: DEFAULT_THEME_ID,
+  resolvedTheme: "dark",
   systemDark: false,
-  followSystem: true,
-  appearanceMode: "system",
+  followSystem: false,
+  appearanceMode: "dark",
   themeHalves: null,
 };
 
@@ -196,10 +197,9 @@ export function readThemePreference(): Theme {
       cause,
     });
   }
-  if (raw !== null && isKnownThemePreference(raw)) {
-    return canonicalThemePreference(raw);
-  }
-  return DEFAULT_THEME_SNAPSHOT.theme;
+  if (raw === null) return DEFAULT_THEME_SNAPSHOT.theme;
+  if (isKnownThemePreference(raw)) return canonicalThemePreference(raw);
+  return "system";
 }
 
 function writeThemePreference(theme: Theme): void {

@@ -28,7 +28,12 @@ export function promptLinkFor(
 ): string | null {
   const trimmed = prompt.trim();
   if (trimmed.length === 0 || trimmed.length > PROMPT_LINK_MAX_PROMPT_LENGTH) return null;
-  return buildNewThreadLink({ prompt: trimmed, ...context, origin: configuredHostedAppUrl() });
+  const origin = configuredHostedAppUrl();
+  return buildNewThreadLink({
+    prompt: trimmed,
+    ...context,
+    ...(origin === null ? {} : { origin }),
+  });
 }
 
 export function promptLinkRepositoryOf(

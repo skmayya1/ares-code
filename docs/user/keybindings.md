@@ -3,6 +3,10 @@
 Customize shortcuts in **Settings → Keybindings** on web and desktop. That page
 also lists the command IDs and defaults available in your version.
 
+## Workspace tabs
+
+Use `ctrl+1` through `ctrl+9` to select the first nine tabs in their current order.
+
 ## Composer controls
 
 In **Settings → Chat → Send shortcut**, choose whether Enter sends, requires

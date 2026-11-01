@@ -8,7 +8,26 @@ import * as Schema from "effect/Schema";
 
 import { DpopPublicJwk as DpopPublicJwkSchema, normalizeDpopHtu } from "./dpopCommon.ts";
 import type { DpopPublicJwk as DpopPublicJwkType } from "./dpopCommon.ts";
-import { stableStringify } from "./relaySigning.ts";
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function stableStringify(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  if (isRecord(value)) {
+    return `{${Object.entries(value)
+      .filter(([, entryValue]) => entryValue !== undefined)
+      // Code-unit order, not localeCompare: signatures and RFC 7638 thumbprints
+      // must match across machines whatever their OS locale.
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entryValue]) => `${JSON.stringify(key)}:${stableStringify(entryValue)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value) ?? "null";
+}
 
 const DPOP_TYP = "dpop+jwt";
 const DPOP_ALG = "ES256";
@@ -16,7 +35,7 @@ const DPOP_ALG = "ES256";
  * How far a proof's `iat` may sit from the verifier's clock, in either direction.
  * Proofs carry the client's clock, so this also bounds tolerated clock skew.
  */
-export const DPOP_MAX_CLOCK_SKEW_SECONDS = 300;
+const DPOP_MAX_CLOCK_SKEW_SECONDS = 300;
 
 export const DpopPublicJwk = DpopPublicJwkSchema;
 export type DpopPublicJwk = DpopPublicJwkType;

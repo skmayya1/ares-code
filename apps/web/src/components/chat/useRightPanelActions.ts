@@ -24,7 +24,7 @@ import { requestWorkspaceContentFocus, requestWorkspaceFocus } from "../../lib/w
 import { setActivePreviewTab } from "../../previewStateStore";
 import { BrowserSettingsReadError } from "../../browser/openFileInPreview";
 import { addBrowserSurface } from "../preview/addBrowserSurface";
-import { focusActivePanelTerminal, focusTerminal } from "../../lib/terminalFocus";
+import { focusTerminal } from "../../lib/terminalFocus";
 import { subscribePreviewAction } from "../preview/previewActionBus";
 import { floatDeviceSurface } from "../preview/agentOpenedPreviews";
 import { browserMiniPlayerSource, usePreviewMiniPlayerStore } from "../../previewMiniPlayerStore";
@@ -83,7 +83,6 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     canOperatePreview,
     diffOpen,
     previewPanelOpen,
-    rightPanelOpen,
     canMaximizeRightPanel,
     rightPanelMaximized,
     supportsPullRequests,
@@ -102,9 +101,12 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
     if (!diffOpen) {
       onDiffPanelOpen?.();
     }
-    if (activeThreadRef) {
-      useRightPanelStore.getState().toggle(activeThreadRef, "diff");
+    if (!activeThreadRef) return;
+    if (diffOpen) {
+      useRightPanelStore.getState().open(activeThreadRef, "chat");
+      return;
     }
+    useRightPanelStore.getState().open(activeThreadRef, "diff");
   };
   const onToggleDiffStable = useStableCallback(onToggleDiff);
   const createBrowserSurface = (profileId?: string) => {
@@ -177,7 +179,7 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
         );
       }
       useRightPanelStore.getState().setMaximized(activeThreadRef, false);
-      useRightPanelStore.getState().close(activeThreadRef);
+      useRightPanelStore.getState().open(activeThreadRef, "chat");
     }
   };
   const closePreviewPanelStable = useStableCallback(closePreviewPanel);
@@ -217,12 +219,8 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
   const activateRightPanelSurfaceStable = useStableCallback(activateRightPanelSurface);
   const toggleRightPanel = () => {
     if (!activeThreadRef) return;
-    if (rightPanelOpen) {
-      closePreviewPanel();
-      return;
-    }
-    useRightPanelStore.getState().toggleVisibility(activeThreadRef);
-    focusActivePanelTerminal(activeThreadRef);
+    useRightPanelStore.getState().open(activeThreadRef, "chat");
+    requestWorkspaceContentFocus();
   };
   const toggleRightPanelStable = useStableCallback(toggleRightPanel);
   const toggleThreadPanel = () => {

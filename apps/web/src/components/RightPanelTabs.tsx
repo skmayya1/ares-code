@@ -1,15 +1,8 @@
-import { sourceControlClients } from "@t3tools/client-runtime/source-control-clients";
-import type { EnvironmentThreadShell } from "@t3tools/client-runtime/state/shell";
-import { useProjects, useServerConfigs, useThreadShells } from "~/state/entities";
-import {
-  threadPullRequestKeysEqual,
-  visibleThreadPullRequests,
-} from "@t3tools/client-runtime/thread-pull-requests";
+import { RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS } from "@t3tools/contracts";
 import type {
   ContextMenuItem,
   EnvironmentId,
   PreviewSessionSnapshot,
-  ProjectId,
   PullRequestState,
   ResolvedKeybindingsConfig,
 } from "@t3tools/contracts";
@@ -30,11 +23,14 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  File,
   FileDiff,
   Files,
   Globe2,
+  MessageSquare,
   Plus,
   TerminalSquare,
+  X,
 } from "lucide-react";
 import { Volume2, VolumeOff } from "lucide";
 import {
@@ -57,7 +53,6 @@ import { readLocalApi } from "~/localApi";
 import { useStableCallback } from "~/hooks/useStableCallback";
 import { Button } from "~/components/ui/button";
 import { MorphIcon } from "~/components/MorphIcon";
-import { AndroidIcon, AppleIcon } from "~/components/Icons";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ui/kbd";
 import {
@@ -72,24 +67,12 @@ import {
 } from "~/components/ui/menu";
 import { useBrowserDefaults } from "~/browser/browserDefaults";
 import { ScrollArea } from "~/components/ui/scroll-area";
-import { PanelTabCloseButton } from "~/components/ui/panel-tab-close-button";
-import { faviconUrlForOrigin } from "@t3tools/shared/favicon";
-import { useTheme } from "~/hooks/useTheme";
 import { useDeviceState } from "~/state/device";
 import type { PreviewPanelInlineSize } from "~/hooks/usePreviewPanelInlineSize";
-import {
-  newestPullRequestSummary,
-  pullRequestEnvironment,
-  useSharedPullRequestSummary,
-} from "~/state/pullRequests";
-import { useEnvironmentQuery } from "~/state/query";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
 
 import { PreviewPanelShell, type PreviewPanelMode } from "./preview/PreviewPanelShell";
-import { FaviconImage } from "./preview/PreviewFaviconIcon";
 import { previewBridge } from "./preview/previewBridge";
-import { PierreEntryIcon } from "./chat/PierreEntryIcon";
-import { resolvePullRequestState } from "./pullRequest/pullRequestPresentation";
 import { PullRequestGlyph } from "~/components/pullRequest/pullRequestIcons";
 import { observeResize } from "~/lib/observeResize";
 
@@ -124,6 +107,7 @@ export interface RightPanelTabsProps {
   /** Keep separate from the DOM click handler so a MouseEvent cannot become a profile id. */
   onAddBrowserInProfile: (profileId: string) => void;
   onAddTerminal: () => void;
+  onAddChat?: (() => void) | undefined;
   onAddDiff: () => void;
   onAddFiles: () => void;
   onAddPullRequest: () => void;
@@ -137,6 +121,7 @@ export interface RightPanelTabsProps {
   pullRequestsAvailable: boolean;
   deviceAvailable: boolean;
   pullRequestStatusSeeds?: Readonly<Record<string, PullRequestTabStatusSeed>>;
+  keepContentMounted?: boolean;
   children: ReactNode;
 }
 
@@ -298,6 +283,7 @@ function RightPanelEmptyState(props: {
   onAddBrowserInProfile: (profileId: string) => void;
   browserProfiles: ReadonlyArray<{ readonly id: string; readonly name: string }>;
   onAddTerminal: () => void;
+  onAddChat?: (() => void) | undefined;
   onAddDiff: () => void;
   onAddFiles: () => void;
   onAddPullRequest: () => void;
@@ -314,6 +300,18 @@ function RightPanelEmptyState(props: {
   const [highlight, setHighlight] = useState(-1);
 
   const actions = [
+    ...(props.onAddChat
+      ? [
+          {
+            label: "Chat",
+            icon: MessageSquare,
+            shortcut: "C",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddChat,
+          },
+        ]
+      : []),
     {
       label: "Browser",
       icon: Globe2,
@@ -537,6 +535,8 @@ function surfaceTitle(
   terminalLabelsById: ReadonlyMap<string, string>,
 ): string {
   switch (surface.kind) {
+    case "chat":
+      return "Chat";
     case "diff":
       return "Diff";
     case "files":
@@ -567,185 +567,6 @@ function surfaceTitle(
       }
     }
   }
-}
-
-function PreviewFavicon({ capturedUrl, url }: { capturedUrl: string | null; url: string | null }) {
-  const publicProviderUrl = faviconUrlForOrigin(url, 32);
-  return (
-    <FaviconImage
-      sources={[capturedUrl, publicProviderUrl]}
-      fallback={<Globe2 className="size-3 shrink-0" />}
-      className="size-3 shrink-0 rounded-sm object-contain"
-    />
-  );
-}
-
-function sameOrigin(left: string, right: string): boolean {
-  try {
-    return new URL(left).origin === new URL(right).origin;
-  } catch {
-    return false;
-  }
-}
-
-function previewFaviconOf(
-  surface: RightPanelSurface,
-  sessions: Readonly<Record<string, PreviewSessionSnapshot>>,
-  desktopByTabId: Readonly<Record<string, DesktopPreviewOverlay>>,
-): { url: string | null; capturedUrl: string | null } {
-  const snapshot =
-    surface.kind === "preview" && surface.resourceId ? sessions[surface.resourceId] : null;
-  const url = !snapshot || snapshot.navStatus._tag === "Idle" ? null : snapshot.navStatus.url;
-  const favicon = snapshot ? (desktopByTabId[snapshot.tabId]?.favicon ?? null) : null;
-  const capturedUrl = favicon && url && sameOrigin(favicon.pageUrl, url) ? favicon.dataUrl : null;
-  return { url, capturedUrl };
-}
-
-function SurfaceIcon({
-  surface,
-  previewUrl,
-  previewCapturedUrl,
-  theme,
-  environmentId,
-  pullRequestStatusSeed,
-}: {
-  surface: RightPanelSurface;
-  previewUrl: string | null;
-  previewCapturedUrl: string | null;
-  theme: "light" | "dark";
-  environmentId: EnvironmentId | null;
-  pullRequestStatusSeed: PullRequestTabStatusSeed | undefined;
-}) {
-  switch (surface.kind) {
-    case "preview":
-      return <PreviewFavicon capturedUrl={previewCapturedUrl} url={previewUrl} />;
-    case "diff":
-      return <FileDiff className="size-3 shrink-0" />;
-    case "files":
-      return <Files className="size-3 shrink-0" />;
-    case "file":
-      return (
-        <PierreEntryIcon
-          pathValue={surface.relativePath}
-          kind="file"
-          theme={theme}
-          className="size-3"
-        />
-      );
-    case "terminal":
-      return <TerminalSquare className="size-3 shrink-0" />;
-    case "pull-request":
-      return (
-        <PullRequestSurfaceIcon
-          surface={surface}
-          environmentId={environmentId}
-          seed={pullRequestStatusSeed}
-        />
-      );
-    case "pull-requests":
-      return <PullRequestGlyph.link className="size-3 shrink-0" />;
-    case "device":
-      return surface.target?.platform === "ios" ? (
-        <AppleIcon className="size-3 shrink-0" />
-      ) : surface.target?.platform === "android" ? (
-        <AndroidIcon className="size-3 shrink-0" />
-      ) : (
-        <Smartphone className="size-3 shrink-0" />
-      );
-  }
-}
-
-export function resolvePullRequestTabLink(
-  threads: readonly Pick<EnvironmentThreadShell, "environmentId" | "pullRequests">[],
-  environmentId: EnvironmentId | null,
-  host: string | null,
-  reference: { repository: string; number: number },
-) {
-  if (environmentId === null || host === null) return undefined;
-  let newest: EnvironmentThreadShell["pullRequests"][number] | undefined;
-  for (const thread of threads) {
-    if (thread.environmentId !== environmentId) continue;
-    for (const link of visibleThreadPullRequests(thread.pullRequests)) {
-      if (
-        !threadPullRequestKeysEqual(link, {
-          host,
-          repository: reference.repository,
-          number: reference.number,
-        })
-      )
-        continue;
-      if (
-        newest === undefined ||
-        (link.snapshot?.syncedAt ?? "") > (newest.snapshot?.syncedAt ?? "")
-      )
-        newest = link;
-    }
-  }
-  return newest;
-}
-
-function PullRequestSurfaceIcon({
-  surface,
-  environmentId,
-  seed,
-}: {
-  surface: Extract<RightPanelSurface, { kind: "pull-request" }>;
-  environmentId: EnvironmentId | null;
-  seed: PullRequestTabStatusSeed | undefined;
-}) {
-  const resolvedEnvironmentId =
-    (surface.environmentId as EnvironmentId | undefined) ?? environmentId;
-  const projects = useProjects();
-  const threads = useThreadShells();
-  const project = projects.find(
-    (entry) => entry.environmentId === resolvedEnvironmentId && entry.id === surface.projectId,
-  );
-  const identity = project?.repositoryIdentity;
-  const host =
-    surface.host ??
-    (identity?.provider
-      ? sourceControlClients.changeRequestHost(identity, identity.provider)
-      : null);
-  const configs = useServerConfigs();
-  const capabilities =
-    resolvedEnvironmentId === null
-      ? undefined
-      : configs.get(resolvedEnvironmentId)?.environment.capabilities;
-  const linkedSnapshot =
-    capabilities !== undefined
-      ? (resolvePullRequestTabLink(threads, resolvedEnvironmentId, host, surface)?.snapshot ?? null)
-      : null;
-  const detail = useEnvironmentQuery(
-    resolvedEnvironmentId === null || capabilities === undefined || linkedSnapshot !== null
-      ? null
-      : pullRequestEnvironment.detail({
-          environmentId: resolvedEnvironmentId,
-          input: {
-            projectId: surface.projectId as ProjectId,
-            ...(capabilities !== undefined && surface.host !== undefined
-              ? { host: surface.host }
-              : {}),
-            repository: surface.repository,
-            number: surface.number,
-            allowStale: false,
-          },
-        }),
-  ).data;
-  const reference = {
-    projectId: surface.projectId as ProjectId,
-    repository: surface.repository,
-    number: surface.number,
-  };
-  const sharedSummary = useSharedPullRequestSummary(resolvedEnvironmentId, reference);
-  const status = linkedSnapshot ?? newestPullRequestSummary(detail, sharedSummary) ?? seed ?? null;
-  if (status === null) {
-    return <PullRequestGlyph.pullRequest className="size-3 shrink-0 text-muted-foreground" />;
-  }
-  const presentation = resolvePullRequestState({
-    state: status.state,
-    isDraft: status.isDraft ?? detail?.isDraft ?? seed?.isDraft ?? false,
-  });
-  return <presentation.Icon className={cn("size-3 shrink-0", presentation.toneClassName)} />;
 }
 
 function SortableTabList(props: {
@@ -790,6 +611,18 @@ function preventTabMiddleButtonDefault(event: ReactMouseEvent) {
   event.preventDefault();
 }
 
+const SURFACE_ICONS = {
+  chat: MessageSquare,
+  diff: FileDiff,
+  files: Files,
+  file: File,
+  preview: Globe2,
+  device: Smartphone,
+  terminal: TerminalSquare,
+  "pull-request": PullRequestGlyph.pullRequest,
+  "pull-requests": PullRequestGlyph.link,
+};
+
 // Stable handlers and per-tab values let the compiler reuse tabs across parent renders.
 function RightPanelTab(
   props: RightPanelTabHandlers & {
@@ -800,11 +633,7 @@ function RightPanelTab(
     title: string;
     audio: TabAudioState;
     audioRuntimeTabId: string | null;
-    previewUrl: string | null;
-    previewCapturedUrl: string | null;
-    theme: "light" | "dark";
     environmentId: EnvironmentId | null;
-    pullRequestStatusSeed: PullRequestTabStatusSeed | undefined;
     renaming: boolean;
     canRename: boolean;
     ownsDesktopTitleBar: boolean;
@@ -826,24 +655,13 @@ function RightPanelTab(
     id: surface.id,
     disabled: props.dragDisabled,
   });
+  const Icon = SURFACE_ICONS[surface.kind];
   const content = (
     <>
-      <PanelTabCloseButton label={`Close ${title}`} onClick={() => onClose(surface)}>
-        <SurfaceIcon
-          surface={surface}
-          previewUrl={props.previewUrl}
-          previewCapturedUrl={props.previewCapturedUrl}
-          theme={props.theme}
-          environmentId={props.environmentId}
-          pullRequestStatusSeed={props.pullRequestStatusSeed}
-        />
-        {props.pending ? (
-          <span
-            className="absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full bg-current"
-            aria-hidden
-          />
-        ) : null}
-      </PanelTabCloseButton>
+      <Icon className="size-[11px] shrink-0" />
+      {props.pending ? (
+        <span className="size-1.5 shrink-0 rounded-full bg-current" aria-hidden />
+      ) : null}
       {audio === "none" || !audioRuntimeTabId ? null : (
         <Tooltip>
           <TooltipTrigger
@@ -894,7 +712,7 @@ function RightPanelTab(
                 onDoubleClick={() => {
                   if (surface.kind === "device" && props.canRename) onStartRename(surface.id);
                 }}
-                className="cursor-pointer flex min-w-0 items-center"
+                className="cursor-pointer flex h-full min-w-0 flex-1 items-center"
                 onClick={() => onActivate(surface)}
               >
                 <span className="truncate">{title}</span>
@@ -914,6 +732,14 @@ function RightPanelTab(
           </TooltipPopup>
         </Tooltip>
       )}
+      <button
+        type="button"
+        aria-label={`Close ${title}`}
+        onClick={() => onClose(surface)}
+        className="cursor-pointer flex size-4 shrink-0 items-center justify-center rounded-full opacity-0 hover:bg-muted group-hover/tab:opacity-100 group-focus-within/tab:opacity-100 [@media(hover:none)]:opacity-100"
+      >
+        <X className="size-3" />
+      </button>
     </>
   );
   return (
@@ -927,11 +753,11 @@ function RightPanelTab(
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn(
-        "cursor-pointer group/tab flex h-6 max-w-36 shrink-0 items-center gap-0.5 rounded-md pr-2 pl-1.5 text-xs",
+        "cursor-pointer group/tab relative mr-0.5 ml-1 flex h-[34px] min-w-20 max-w-44 flex-[0_1_150px] items-center gap-2 overflow-hidden rounded-t-xl px-3 text-xs first:ml-0 first:rounded-tl-none",
         props.ownsDesktopTitleBar && "[-webkit-app-region:no-drag]",
         props.active
-          ? "bg-accent text-foreground"
-          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          ? "z-10 bg-background text-foreground"
+          : "text-muted-foreground after:pointer-events-none after:absolute after:inset-y-2 after:right-0 after:w-px after:bg-sidebar-border hover:bg-accent/60 hover:text-foreground hover:after:opacity-0 [&:has(+[data-active-tab=true])]:after:opacity-0",
         isDragging && "relative z-10",
       )}
     >
@@ -944,7 +770,6 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   const focusedSurface = props.surfaces.find((surface) => surface.id === props.activeSurfaceId);
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
   const browserProfiles = useBrowserDefaults().profiles;
-  const { resolvedTheme } = useTheme();
   const tabListRef = useRef<HTMLDivElement>(null);
   const addSurfaceTriggerRef = useRef<HTMLButtonElement>(null);
   const [renamingDevice, setRenamingDevice] = useState<string | null>(null);
@@ -957,15 +782,25 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
 
   if (props.open === false && addSurfaceMenuOpen) setAddSurfaceMenuOpen(false);
 
-  const onNewSurfaceKeyDown = useEffectEvent((event: KeyboardEvent) => {
+  const onPanelShortcutKeyDown = useEffectEvent((event: KeyboardEvent) => {
     if (event.defaultPrevented || event.isComposing) return;
-    if (
-      resolveShortcutCommand(event, props.keybindings, {
-        context: { ...props.getShortcutContext(), rightPanelOpen: true },
-      }) !== "rightPanel.new"
-    )
-      return;
+    const command = resolveShortcutCommand(event, props.keybindings, {
+      context: { ...props.getShortcutContext(), rightPanelOpen: true },
+    });
+    const tabIndex = RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS.findIndex((entry) => entry === command);
+    if (command !== "rightPanel.new" && tabIndex === -1) return;
     if (!addSurfaceMenuOpen && document.querySelector(LAUNCHER_SHORTCUT_BLOCKING_LAYERS)) return;
+    if (tabIndex !== -1) {
+      const surface = props.surfaces[tabIndex];
+      if (!surface) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (!event.repeat) {
+        setAddSurfaceMenuOpen(false);
+        props.onActivate(surface);
+      }
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     if (!event.repeat) {
@@ -973,11 +808,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       setAddSurfaceMenuOpen(true);
     }
   });
-  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a document keydown listener for the new surface shortcut while the panel is open
+  // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes a document keydown listener for panel shortcuts while the panel is open
   useEffect(() => {
     if (props.open === false) return;
-    document.addEventListener("keydown", onNewSurfaceKeyDown, true);
-    return () => document.removeEventListener("keydown", onNewSurfaceKeyDown, true);
+    document.addEventListener("keydown", onPanelShortcutKeyDown, true);
+    return () => document.removeEventListener("keydown", onPanelShortcutKeyDown, true);
   }, [props.open]);
 
   const updateTabScrollState = (viewport: HTMLDivElement) => {
@@ -1009,6 +844,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   };
 
   const addSurfaceActions = [
+    ...(props.onAddChat
+      ? [
+          {
+            label: "Chat",
+            icon: MessageSquare,
+            shortcut: "C",
+            available: true,
+            disabledReason: "",
+            onClick: props.onAddChat,
+          },
+        ]
+      : []),
     {
       label: "Browser",
       icon: Globe2,
@@ -1239,7 +1086,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
     >
       <div
         className={cn(
-          "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 pl-2",
+          "flex h-11 min-h-11 shrink-0 items-center gap-1.5 bg-sidebar",
           props.mode === "inline" && !props.layoutControls ? "pr-28" : "pr-3",
           ownsDesktopTitleBar && "drag-region",
           ownsDesktopTitleBar && "wco:pr-(--workspace-native-controls-inset)",
@@ -1255,15 +1102,10 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
           className="min-w-0 flex-1"
           data-right-panel-tab-list
         >
-          <div className="flex h-full w-max min-w-full items-center gap-1">
+          <div className="flex h-full w-full min-w-full items-end">
             <SortableTabList surfaces={props.surfaces} onMove={props.onMoveSurface}>
               {props.surfaces.map((surface) => {
                 const previewTabId = previewTabIdOf(surface, props.previewSessions);
-                const favicon = previewFaviconOf(
-                  surface,
-                  props.previewSessions,
-                  props.desktopByTabId,
-                );
                 return (
                   <RightPanelTab
                     key={surface.id}
@@ -1278,11 +1120,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     audioRuntimeTabId={
                       previewTabId ? (props.previewRuntimeTabId?.(previewTabId) ?? null) : null
                     }
-                    previewUrl={favicon.url}
-                    previewCapturedUrl={favicon.capturedUrl}
-                    theme={resolvedTheme}
                     environmentId={props.environmentId}
-                    pullRequestStatusSeed={props.pullRequestStatusSeeds?.[surface.id]}
                     renaming={renamingDevice === surface.id}
                     canRename={props.onRenameDevice !== undefined}
                     ownsDesktopTitleBar={ownsDesktopTitleBar}
@@ -1303,7 +1141,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   render={
                     <Button
                       aria-label="Add panel surface"
-                      className="shrink-0"
+                      className="mb-1 ml-1.5 shrink-0"
                       size="icon-xs"
                       variant="ghost-muted"
                     />
@@ -1434,6 +1272,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddBrowserInProfile={props.onAddBrowserInProfile}
             browserProfiles={browserProfiles}
             onAddTerminal={props.onAddTerminal}
+            onAddChat={props.onAddChat}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
             onAddPullRequest={props.onAddPullRequest}
@@ -1447,9 +1286,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             pullRequestsAvailable={props.pullRequestsAvailable}
             deviceAvailable={props.deviceAvailable}
           />
-        ) : (
-          props.children
-        )}
+        ) : null}
+        {props.activeSurfaceId !== null || props.keepContentMounted ? props.children : null}
       </div>
     </PreviewPanelShell>
   );

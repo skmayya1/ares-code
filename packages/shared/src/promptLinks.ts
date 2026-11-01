@@ -1,4 +1,4 @@
-import { DEFAULT_HOSTED_APP_URL } from "./connectAuth.ts";
+const DEFAULT_HOSTED_APP_URL = "https://app.t3.codes";
 
 export const PROMPT_LINK_MAX_PROMPT_LENGTH = 8_000;
 

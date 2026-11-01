@@ -48,7 +48,6 @@ import {
   threadHtmlRenderAttachmentIds,
 } from "../attachmentStore.ts";
 import * as ServerConfig from "../config.ts";
-import { CloudManagedEndpointRuntime } from "../cloud/ManagedEndpointRuntime.ts";
 import * as CommandOutputHub from "../orchestration-v2/CommandOutputHub.ts";
 import { GUEST_FAILURE } from "../orchestration-v2/GuestShareDecider.ts";
 import * as Orchestrator from "../orchestration-v2/Orchestrator.ts";
@@ -151,6 +150,12 @@ const inviteSignature = (shareId: string, key: Uint8Array) =>
 
 const inactive = new GuestShareAccessError({ reason: "inactive" });
 
+/** The public hostname guest links point at; null leaves sharing unavailable. */
+export class GuestShareHost extends Context.Reference<Effect.Effect<string | null>>(
+  "t3/guest/GuestShareHost",
+  { defaultValue: () => Effect.succeed(null) },
+) {}
+
 export class GuestShareService extends Context.Service<
   GuestShareService,
   {
@@ -230,7 +235,6 @@ const make = Effect.gen(function* () {
   const commandOutputs = yield* CommandOutputHub.CommandOutputHub;
   const providerRegistry = yield* ProviderRegistry.ProviderRegistry;
   const serverSettings = yield* ServerSettings.ServerSettingsService;
-  const managedEndpoint = yield* CloudManagedEndpointRuntime;
   const { attachmentsDir } = yield* ServerConfig.ServerConfig;
   const fileSystem = yield* FileSystem.FileSystem;
   const crypto = yield* Crypto.Crypto;
@@ -280,9 +284,7 @@ const make = Effect.gen(function* () {
       return decodeSessionClaims(base64UrlDecodeUtf8(parts.payload));
     });
 
-  const connectHostname = managedEndpoint.inspectConnector.pipe(
-    Effect.map((facts) => facts?.hostname ?? null),
-  );
+  const connectHostname = yield* GuestShareHost;
   // A beta: while it is off, no link opens and every guest request is refused.
   const sharingEnabled = serverSettings.getSettings.pipe(
     Effect.map((settings) => settings.guestSharingEnabled),
@@ -597,9 +599,8 @@ const make = Effect.gen(function* () {
         }),
       ),
       Stream.takeUntil((event) => event.type === "ended"),
-      // Unlinking T3 Connect closes it quietly, so a tunnel that comes back on the same host
-      // keeps the guest in. Turning the beta off closes it the same way. Closing and expiry end
-      // it above, with `ended`.
+      // Losing the host closes it quietly, so a host that comes back keeps the guest in.
+      // Turning the beta off closes it the same way. Closing and expiry end it above, with `ended`.
       Stream.interruptWhen(
         Effect.all([connectHostname, sharingEnabled]).pipe(
           Effect.repeat({

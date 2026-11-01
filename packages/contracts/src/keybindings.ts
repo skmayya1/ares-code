@@ -20,6 +20,18 @@ export const THREAD_JUMP_KEYBINDING_COMMANDS = [
 ] as const;
 export type ThreadJumpKeybindingCommand = (typeof THREAD_JUMP_KEYBINDING_COMMANDS)[number];
 
+export const RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS = [
+  "rightPanel.jump.1",
+  "rightPanel.jump.2",
+  "rightPanel.jump.3",
+  "rightPanel.jump.4",
+  "rightPanel.jump.5",
+  "rightPanel.jump.6",
+  "rightPanel.jump.7",
+  "rightPanel.jump.8",
+  "rightPanel.jump.9",
+] as const;
+
 export const MODEL_PICKER_JUMP_KEYBINDING_COMMANDS = [
   "modelPicker.jump.1",
   "modelPicker.jump.2",
@@ -67,6 +79,7 @@ export const STATIC_KEYBINDING_COMMANDS = [
   "terminal.close",
   "rightPanel.toggle",
   "rightPanel.new",
+  ...RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS,
   "threadPanel.toggle",
   "rightPanel.toggleMaximized",
   "rightPanel.close",

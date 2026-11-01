@@ -15,7 +15,6 @@ import * as Statement from "effect/sql/Statement";
 import * as ServerConfig from "../config.ts";
 import * as ResourceAttribution from "../resourceTelemetry/ResourceAttribution.ts";
 import * as ServerLogger from "../serverLogger.ts";
-import * as BrowserTraceCollector from "./BrowserTraceCollector.ts";
 
 export const layer = Layer.unwrap(
   Effect.gen(function* () {
@@ -23,7 +22,6 @@ export const layer = Layer.unwrap(
 
     const traces = config.otlpTracesExport;
     const metrics = config.otlpMetricsExport;
-    // Keep serialization in context for the browser trace forwarder's exporter.
     const layerSerialization = SharedObservability.layerOtlpSerialization(traces.protocol);
     const resource = ServerConfig.otlpResource(config, yield* HostProcess.Hostname);
     const attribution = yield* ResourceAttribution.ResourceAttribution;
@@ -71,10 +69,7 @@ export const layer = Layer.unwrap(
           ...(delegate ? { delegate } : {}),
         });
 
-        return Layer.mergeAll(
-          Layer.succeed(Tracer.Tracer, tracer),
-          BrowserTraceCollector.layer(sink),
-        );
+        return Layer.succeed(Tracer.Tracer, tracer);
       }),
     ).pipe(Layer.provide(OtlpExporter.layerFlusher), Layer.provideMerge(layerSerialization));
 

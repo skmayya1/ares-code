@@ -2,8 +2,8 @@
 
 A [stable launcher](../../apps/server/src/serviceLauncher.ts) owns the runtime
 selected by systemd or launchd. It is the only runtime writer of durable service
-state. Server children request updates over inherited IPC; they never rewrite
-their service definition or select their own replacement. Local service commands
+state. Server children never rewrite their service definition or select their
+own replacement; this build has no remote update request. Local service commands
 may replace the launcher and state while the service is stopped. Foreground CLI
 processes do not self-update.
 
