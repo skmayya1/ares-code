@@ -360,6 +360,7 @@ export const layer: Layer.Layer<
                 text: projectComposerContextForProvider({
                   text: message.text,
                   records: message.context?.records ?? [],
+                  sideChatContext: message.context?.sideChatContext,
                 }),
                 attachments: message.attachments,
                 createdBy: message.createdBy,

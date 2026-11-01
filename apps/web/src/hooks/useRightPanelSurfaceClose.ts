@@ -13,12 +13,15 @@ import { readLocalApi } from "../localApi";
 import { setActivePreviewTab, useThreadPreviewState } from "../previewStateStore";
 import {
   selectActiveRightPanelSurface,
+  selectPaneSurfaces,
   selectThreadRightPanelState,
   useRightPanelStore,
   type RightPanelSurface,
 } from "../rightPanelStore";
 import { previewEnvironment } from "../state/preview";
 import { readEnvironmentScope, useEnvironmentScope } from "../state/session";
+import { threadEnvironment } from "../state/threads";
+import { useOrchestrationCommand } from "../state/use-orchestration-command";
 import { useAtomCommand } from "../state/use-atom-command";
 import { useTerminalUiStateStore } from "../terminalUiStateStore";
 import { useStableCallback } from "./useStableCallback";
@@ -29,6 +32,7 @@ export function useRightPanelSurfaceClose(input: {
   readonly terminalLabelsById: ReadonlyMap<string, string>;
 }) {
   const { threadRef, terminalLabelsById } = input;
+  const deleteSideChat = useOrchestrationCommand(threadEnvironment.delete, "delete side chat");
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
   const canOperatePreview = useEnvironmentScope(
     threadRef?.environmentId ?? null,
@@ -37,8 +41,8 @@ export function useRightPanelSurfaceClose(input: {
   const previewState = useThreadPreviewState(threadRef);
   const terminalActions = useThreadTerminalActions(threadRef);
   const storeCloseTerminal = useTerminalUiStateStore((state) => state.closeTerminal);
-  const surfaces = useRightPanelStore(
-    (state) => selectThreadRightPanelState(state.byThreadKey, threadRef).surfaces,
+  const panelState = useRightPanelStore((state) =>
+    selectThreadRightPanelState(state.byThreadKey, threadRef),
   );
 
   const releaseSurfaceResources = (ref: ScopedThreadRef, surface: RightPanelSurface) => {
@@ -80,7 +84,7 @@ export function useRightPanelSurfaceClose(input: {
     );
   };
   // The active surface closes last so the panel does not flash through it.
-  const finishClose = (toClose: readonly RightPanelSurface[]) => {
+  const finishClose = async (toClose: readonly RightPanelSurface[]) => {
     if (!threadRef) return;
     const store = useRightPanelStore.getState();
     const activeId = selectThreadRightPanelState(store.byThreadKey, threadRef).activeSurfaceId;
@@ -90,6 +94,14 @@ export function useRightPanelSurfaceClose(input: {
     for (const surface of ordered) {
       // Releasing a browser drops its session, which prunes the tab automatically; close it
       // first so the close stays a user action that hides the panel after the last tab.
+      if (surface.kind === "chat" && "threadId" in surface) {
+        const result = await deleteSideChat({
+          environmentId: threadRef.environmentId,
+          input: { threadId: surface.threadId },
+        });
+        if (result._tag !== "Success") continue;
+        store.removeThread({ environmentId: threadRef.environmentId, threadId: surface.threadId });
+      }
       store.closeSurface(threadRef, surface.id);
       releaseSurfaceResources(threadRef, surface);
     }
@@ -132,14 +144,17 @@ export function useRightPanelSurfaceClose(input: {
     );
   });
   const closeOtherSurfaces = useStableCallback((surface: RightPanelSurface) =>
-    closeSurfaces(surfaces.filter((entry) => entry.id !== surface.id)),
+    closeSurfaces(
+      selectPaneSurfaces(panelState, surface.id).filter((entry) => entry.id !== surface.id),
+    ),
   );
   const closeSurfacesToRight = useStableCallback((surface: RightPanelSurface) => {
+    const surfaces = selectPaneSurfaces(panelState, surface.id);
     const surfaceIndex = surfaces.findIndex((entry) => entry.id === surface.id);
     if (surfaceIndex < 0) return;
     closeSurfaces(surfaces.slice(surfaceIndex + 1));
   });
-  const closeAllSurfaces = useStableCallback(() => closeSurfaces(surfaces));
+  const closeAllSurfaces = useStableCallback(() => closeSurfaces(selectPaneSurfaces(panelState)));
 
   return { closeSurface, closeOtherSurfaces, closeSurfacesToRight, closeAllSurfaces };
 }

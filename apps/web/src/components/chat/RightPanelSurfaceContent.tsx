@@ -90,6 +90,7 @@ export function RightPanelSurfaceContent(props: {
             tabId={surface.resourceId}
             configuredUrls={props.configuredPreviewUrls}
             visible={visible}
+            shortcutsEnabled={props.activeSurfaceId === surface.id}
             onSendAnnotation={props.onSendAnnotation}
           />
         </Suspense>
@@ -122,7 +123,7 @@ export function RightPanelSurfaceContent(props: {
         return (
           <PullRequestsUnavailableState
             title="Pull requests unavailable"
-            error="Update this environment's T3 Code server to browse pull requests."
+            error="Update this environment's Ares server to browse pull requests."
           />
         );
       }
@@ -201,7 +202,7 @@ export function RightPanelSurfaceContent(props: {
             composerDraftTarget={props.composerDraftTarget}
             keybindings={props.keybindings}
             availableEditors={files.availableEditors}
-            openInShortcutEnabled={visible}
+            openInShortcutEnabled={visible && props.activeSurfaceId === surface.id}
             relativePath={surface.kind === "file" ? surface.relativePath : null}
             {...(attachment ? { attachment } : {})}
             revealLine={surface.kind === "file" ? (surface.revealLine ?? null) : null}

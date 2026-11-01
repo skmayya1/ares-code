@@ -73,7 +73,7 @@ export function SidebarSectionPlaceholder(props: {
 }
 
 export function SidebarDragBoundary(props: {
-  marker: "pinned-header" | "pinned-divider";
+  marker: "pinned-header" | "pinned-divider" | "working-header";
   label: string;
   visible: boolean;
   isDropTarget: boolean;

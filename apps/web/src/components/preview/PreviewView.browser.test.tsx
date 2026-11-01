@@ -275,7 +275,7 @@ describe("PreviewView", () => {
 
   it("focuses the address bar each time the focus-url shortcut fires", async () => {
     setup();
-    await using _screen = await render(view());
+    await using screen = await render(view());
     const address = page.getByRole("textbox");
 
     act(() => dispatchPreviewAction("focus-url"));
@@ -285,5 +285,12 @@ describe("PreviewView", () => {
     await expect.element(address).not.toHaveFocus();
     act(() => dispatchPreviewAction("focus-url"));
     await expect.element(address).toHaveFocus();
+
+    await screen.rerender(
+      <PreviewView threadRef={TEST_THREAD_REF} visible shortcutsEnabled={false} />,
+    );
+    (address.element() as HTMLInputElement).blur();
+    await act(() => dispatchPreviewAction("focus-url"));
+    await expect.element(address).not.toHaveFocus();
   });
 });

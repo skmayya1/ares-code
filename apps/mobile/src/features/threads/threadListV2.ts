@@ -465,6 +465,7 @@ export function buildThreadListV2ListItems(input: {
   readonly pendingTasks: ReadonlyArray<PendingNewTask>;
   readonly workingCount?: number;
   readonly workingShelfExpanded?: boolean;
+  readonly hideWorkingShelfHeader?: boolean;
   readonly workingShelfHeaderIndex?: number | null;
   readonly snoozedCount?: number;
   readonly snoozedShelfExpanded?: boolean;
@@ -526,18 +527,21 @@ export function buildThreadListV2ListItems(input: {
   const snoozedEnd = settledShelfHeaderIndex ?? threadItems.length;
   const workingEnd = snoozedShelfHeaderIndex ?? snoozedEnd;
   const activeEnd = workingShelfHeaderIndex ?? workingEnd;
-  const result: ThreadListV2ListItem[] = [...pendingItems, ...threadItems.slice(0, activeEnd)];
+  const result: ThreadListV2ListItem[] = [];
   const shelfDisabled = input.shelfPreferencesLoading === true;
   if (workingShelfHeaderIndex !== null && workingCount > 0) {
-    result.push({
-      type: "v2-working-shelf",
-      key: "v2-working-shelf",
-      count: workingCount,
-      expanded: input.workingShelfExpanded === true,
-      disabled: shelfDisabled,
-    });
+    if (!input.hideWorkingShelfHeader) {
+      result.push({
+        type: "v2-working-shelf",
+        key: "v2-working-shelf",
+        count: workingCount,
+        expanded: input.workingShelfExpanded === true,
+        disabled: shelfDisabled,
+      });
+    }
     result.push(...threadItems.slice(workingShelfHeaderIndex, workingEnd));
   }
+  result.push(...pendingItems, ...threadItems.slice(0, activeEnd));
   if (snoozedShelfHeaderIndex !== null && snoozedCount > 0) {
     result.push({
       type: "v2-snoozed-shelf",

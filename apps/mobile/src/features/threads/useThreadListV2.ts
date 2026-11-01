@@ -51,6 +51,7 @@ export function useThreadListV2(input: {
   readonly shelfPreferencesLoaded: boolean;
   readonly workingShelfEnabled: boolean;
   readonly workingShelfExpanded: boolean;
+  readonly hideWorkingShelfHeader?: boolean;
   readonly snoozedShelfExpanded: boolean;
   readonly settledShelfExpanded: boolean;
   readonly selectedThreadKey: string | null;
@@ -151,6 +152,7 @@ export function useThreadListV2(input: {
     pendingTasks,
     workingCount: layout.workingCount,
     workingShelfExpanded: input.workingShelfExpanded,
+    hideWorkingShelfHeader: input.hideWorkingShelfHeader,
     workingShelfHeaderIndex: layout.workingShelfHeaderIndex,
     snoozedCount: layout.snoozedCount,
     snoozedShelfExpanded: input.snoozedShelfExpanded,

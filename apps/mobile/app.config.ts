@@ -18,7 +18,7 @@ const personalTeamBundleIdentifier = repoEnv.T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID?
 const IOS_BUNDLE_IDENTIFIER_PATTERN = /^[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$/;
 
 const fromRepoRoot = (relativePath: string) => `../../${relativePath}`;
-const androidAdaptiveForeground = "./assets/android-icon-foreground.png";
+const androidAdaptiveForeground = "../../assets/ares/icon-1024.png";
 
 if (
   isIosPersonalTeamBuild &&
@@ -36,9 +36,8 @@ const DEVELOPMENT_ASSETS = {
   splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.developmentIosIconPng),
   androidAdaptiveForeground,
   androidAdaptiveBackgroundColor: "#347FF8",
-  androidAdaptiveBackgroundImage: "./assets/android-icon-background-dev.png",
-  androidSplashIcon: "./assets/android-splash-icon-dev.png",
-  androidMonochromeIcon: "./assets/android-icon-mark.png",
+  androidAdaptiveBackgroundImage: undefined,
+  androidSplashIcon: "../../assets/ares/icon-1024.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
   androidNotificationColor: "#00639B",
 } as const;
@@ -49,9 +48,8 @@ const PREVIEW_ASSETS = {
   splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng),
   androidAdaptiveForeground,
   androidAdaptiveBackgroundColor: "#111533",
-  androidAdaptiveBackgroundImage: "./assets/android-icon-background-nightly.png",
-  androidSplashIcon: "./assets/android-splash-icon-nightly.png",
-  androidMonochromeIcon: "./assets/android-icon-mark.png",
+  androidAdaptiveBackgroundImage: undefined,
+  androidSplashIcon: "../../assets/ares/icon-1024.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
   androidNotificationColor: "#7565C7",
 } as const;
@@ -63,29 +61,28 @@ const RELEASE_ASSETS = {
   androidAdaptiveForeground,
   androidAdaptiveBackgroundColor: "#000000",
   androidAdaptiveBackgroundImage: undefined,
-  androidSplashIcon: "./assets/android-splash-icon-prod.png",
-  androidMonochromeIcon: "./assets/android-icon-mark.png",
+  androidSplashIcon: "../../assets/ares/icon-1024.png",
   androidNotificationIcon: "./assets/android-notification-icon.png",
   androidNotificationColor: "#FFFFFF",
 } as const;
 
 const VARIANT_CONFIG = {
   development: {
-    appName: "T3 Code Dev",
+    appName: "Ares Dev",
     scheme: "t3code-dev",
     iosBundleIdentifier: "com.t3tools.t3code.dev",
     androidPackage: "com.t3tools.t3code.dev",
     assets: DEVELOPMENT_ASSETS,
   },
   preview: {
-    appName: "T3 Code Preview",
+    appName: "Ares Preview",
     scheme: "t3code-preview",
     iosBundleIdentifier: "com.t3tools.t3code.preview",
     androidPackage: "com.t3tools.t3code.preview",
     assets: PREVIEW_ASSETS,
   },
   production: {
-    appName: "T3 Code",
+    appName: "Ares",
     scheme: "t3code",
     iosBundleIdentifier: "com.t3tools.t3code",
     androidPackage: "com.t3tools.t3code",
@@ -278,7 +275,6 @@ const config: ExpoConfig = {
         ? { backgroundImage: variant.assets.androidAdaptiveBackgroundImage }
         : {}),
       foregroundImage: variant.assets.androidAdaptiveForeground,
-      monochromeImage: variant.assets.androidMonochromeIcon,
     },
     // JS back dispatch needs RN's Android 16 shim and withAndroidPredictiveBackCompat on Android 13-15.
     predictiveBackGestureEnabled: true,

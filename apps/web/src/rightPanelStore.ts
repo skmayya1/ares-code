@@ -9,8 +9,20 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { useClosedViewStore } from "./closedViewStore";
 import { resolveStorage } from "./lib/storage";
+import { randomUUID } from "./lib/utils";
 import type { ThreadPanelPresentation } from "./rightPanelLayout";
 import type { ChatFileAttachment } from "./types";
+import {
+  adjacentWorkspacePane,
+  mapWorkspaceLayout,
+  removeWorkspacePane,
+  restoreWorkspaceLayout,
+  splitWorkspaceSurface,
+  workspacePanes,
+  type PaneDirection,
+  type SplitDirection,
+  type WorkspaceLayout,
+} from "./workspaceLayout";
 
 const RIGHT_PANEL_KINDS = [
   "chat",
@@ -36,6 +48,7 @@ export interface DeviceTabTarget {
 
 export type RightPanelSurface =
   | { id: "chat"; kind: "chat" }
+  | { id: `side-chat:${string}`; kind: "chat"; threadId: ThreadId; title: string; context?: string }
   | { id: `browser:${string}`; kind: "preview"; resourceId: string }
   | { id: "browser:new"; kind: "preview"; resourceId: null }
   | { id: "device" | `device:${string}`; kind: "device"; target?: DeviceTabTarget; title?: string }
@@ -79,7 +92,7 @@ export type RightPanelSurface =
   | { id: "pull-requests"; kind: "pull-requests" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
-const RIGHT_PANEL_STORAGE_VERSION = 14;
+const RIGHT_PANEL_STORAGE_VERSION = 15;
 
 export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
   EnvironmentId.make("pull-requests-panel"),
@@ -89,6 +102,9 @@ export const PULL_REQUESTS_PANEL_REF = scopeThreadRef(
 const isPullRequestsPanelKey = (threadKey: string) => threadKey.endsWith(":pull-requests-panel");
 
 export interface ThreadRightPanelState {
+  layout?: WorkspaceLayout;
+  focusedPaneId?: string;
+  maximizedPaneId?: string | undefined;
   isOpen: boolean;
   activeSurfaceId: string | null;
   surfaces: RightPanelSurface[];
@@ -124,6 +140,7 @@ interface RightPanelStoreState {
     ref: ScopedThreadRef,
     kind: Exclude<RightPanelKind, "file" | "terminal" | "pull-request">,
   ) => void;
+  openSideChat: (ref: ScopedThreadRef, threadId: ThreadId, context?: string) => void;
   openDevice: (ref: ScopedThreadRef, target: DeviceTabTarget, automatic?: boolean) => void;
   renameDevice: (ref: ScopedThreadRef, surfaceId: string, title: string) => void;
   openBrowser: (ref: ScopedThreadRef, tabId: string | null) => void;
@@ -168,6 +185,13 @@ interface RightPanelStoreState {
   closeOtherSurfaces: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeSurfacesToRight: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeAllSurfaces: (ref: ScopedThreadRef) => void;
+  splitSurface: (ref: ScopedThreadRef, surfaceId: string, direction: SplitDirection) => void;
+  focusPane: (ref: ScopedThreadRef, paneId: string) => void;
+  focusAdjacentPane: (ref: ScopedThreadRef, direction: PaneDirection, moveTab?: boolean) => void;
+  resizeSplit: (ref: ScopedThreadRef, splitId: string, ratio: number) => void;
+  resizeFocusedPane: (ref: ScopedThreadRef, grow: boolean) => void;
+  toggleMaximizedPane: (ref: ScopedThreadRef) => void;
+  closePane: (ref: ScopedThreadRef) => void;
   moveSurface: (ref: ScopedThreadRef, surfaceId: string, toIndex: number) => void;
   reconcileBrowserSurfaces: (
     ref: ScopedThreadRef,
@@ -310,7 +334,50 @@ const updateThreadStateMap = (
   updater: (current: ThreadRightPanelState) => ThreadRightPanelState,
 ): Record<string, ThreadRightPanelState> => {
   const current = byThreadKey[threadKey] ?? EMPTY_THREAD_STATE;
-  const next = updater(current);
+  let next = updater(current);
+  if (next === current) return byThreadKey;
+  if (next.layout) {
+    let selected = next.activeSurfaceId;
+    const rawPanes = workspacePanes(next.layout);
+    if (
+      current.activeSurfaceId &&
+      !next.surfaces.some((surface) => surface.id === current.activeSurfaceId)
+    ) {
+      const focused = rawPanes.find((pane) => pane.id === current.focusedPaneId);
+      selected =
+        focused?.surfaceIds.find((id) => next.surfaces.some((surface) => surface.id === id)) ??
+        selected;
+    }
+    const surfaceIds: string[] = next.surfaces.map((surface) => surface.id);
+    let restored = restoreWorkspaceLayout(next.layout, surfaceIds, selected, next.focusedPaneId);
+    let layout = restored.layout;
+    // Only removed tabs collapse a pane; splitting or moving its last tab keeps the launcher.
+    for (const pane of workspacePanes(layout)) {
+      const before = rawPanes.find((entry) => entry.id === pane.id);
+      if (
+        pane.surfaceIds.length === 0 &&
+        before?.surfaceIds.length &&
+        before.surfaceIds.every((id) => !surfaceIds.includes(id))
+      ) {
+        layout = removeWorkspacePane(layout, pane.id);
+      }
+    }
+    if (layout !== restored.layout)
+      restored = restoreWorkspaceLayout(
+        layout,
+        surfaceIds,
+        restored.activeSurfaceId,
+        restored.focusedPaneId,
+      );
+    next = { ...next, ...restored };
+    if (next.maximizedPaneId && restored.focusedPaneId !== current.focusedPaneId) {
+      next.maximizedPaneId = restored.focusedPaneId;
+    }
+    if (!workspacePanes(restored.layout).some((pane) => pane.id === next.maximizedPaneId)) {
+      const { maximizedPaneId: _removed, ...rest } = next;
+      next = rest;
+    }
+  }
   if (
     !next.isOpen &&
     next.activeSurfaceId === null &&
@@ -434,6 +501,64 @@ function normalizeRevealLine(line: number | undefined): number | null {
   return Math.max(1, Math.trunc(line));
 }
 
+function migrateTerminalGroups(current: ThreadRightPanelState): ThreadRightPanelState {
+  const next = { ...current };
+  for (const surface of current.surfaces) {
+    if (surface.kind !== "terminal" || surface.terminalIds.length <= 1) continue;
+    const terminals = surface.terminalIds.map(terminalSurface);
+    const first = terminals[0]!;
+    const restored = restoreWorkspaceLayout(
+      next.layout,
+      next.surfaces.map((entry) => entry.id),
+      next.activeSurfaceId,
+      next.focusedPaneId,
+    );
+    let layout = mapWorkspaceLayout(restored.layout, (node) => {
+      if (node.type !== "pane" || !node.surfaceIds.includes(surface.id)) return node;
+      return {
+        ...node,
+        surfaceIds: node.surfaceIds.map((id) => (id === surface.id ? first.id : id)),
+        activeSurfaceId: node.activeSurfaceId === surface.id ? first.id : node.activeSurfaceId,
+      };
+    });
+    let previous = first;
+    for (const terminal of terminals.slice(1)) {
+      layout = mapWorkspaceLayout(layout, (node) => {
+        if (node.type !== "pane" || !node.surfaceIds.includes(previous.id)) return node;
+        return {
+          type: "split",
+          id: `split:migrated:${terminal.id}`,
+          direction: surface.splitDirection ?? "horizontal",
+          ratio: 50,
+          first: node,
+          second: {
+            type: "pane",
+            id: `migrated:${terminal.id}`,
+            surfaceIds: [terminal.id],
+            activeSurfaceId: terminal.id,
+          },
+        };
+      });
+      previous = terminal;
+    }
+    const surfaces = next.surfaces.flatMap((entry) =>
+      entry.id === surface.id ? terminals : [entry],
+    );
+    let activeSurfaceId = next.activeSurfaceId;
+    if (activeSurfaceId === surface.id) activeSurfaceId = `terminal:${surface.activeTerminalId}`;
+    Object.assign(next, {
+      surfaces,
+      ...restoreWorkspaceLayout(
+        layout,
+        surfaces.map((entry) => entry.id),
+        activeSurfaceId,
+        restored.focusedPaneId,
+      ),
+    });
+  }
+  return next;
+}
+
 export function migratePersistedRightPanelState(persistedState: unknown): {
   byThreadKey: Record<string, ThreadRightPanelState>;
   threadPanelVisibilityByThreadKey: Record<string, ThreadPanelVisibility>;
@@ -551,6 +676,14 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
                   isOpen,
                   surfaces,
                   activeSurfaceId,
+                  ...(validThreadState?.layout
+                    ? restoreWorkspaceLayout(
+                        validThreadState.layout,
+                        surfaces.map((surface) => surface.id),
+                        activeSurfaceId,
+                        validThreadState.focusedPaneId,
+                      )
+                    : {}),
                   ...(typeof validThreadState?.proactiveDiffTurnId === "string"
                     ? { proactiveDiffTurnId: RunId.make(validThreadState.proactiveDiffTurnId) }
                     : {}),
@@ -583,7 +716,12 @@ export function migratePersistedRightPanelState(persistedState: unknown): {
           }),
         )
       : {};
-  return { byThreadKey, threadPanelVisibilityByThreadKey };
+  return {
+    byThreadKey: Object.fromEntries(
+      Object.entries(byThreadKey).map(([key, state]) => [key, migrateTerminalGroups(state)]),
+    ),
+    threadPanelVisibilityByThreadKey,
+  };
 }
 
 export const useRightPanelStore = create<RightPanelStoreState>()(
@@ -650,6 +788,25 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
               return upsertSurface(current, existing ?? browserSurface(null));
             }
             return upsertSurface(current, singletonSurface(kind));
+          }),
+        ),
+      openSideChat: (ref, threadId, context) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            let number = 1;
+            const titles = new Set(
+              current.surfaces.flatMap((surface) =>
+                surface.kind === "chat" && "threadId" in surface ? [surface.title] : [],
+              ),
+            );
+            while (titles.has(`Side Chat ${number}`)) number += 1;
+            return upsertSurface(current, {
+              id: `side-chat:${threadId}`,
+              kind: "chat",
+              threadId,
+              title: `Side Chat ${number}`,
+              ...(context === undefined ? {} : { context }),
+            });
           }),
         ),
       openDevice: (ref, target, automatic = false) =>
@@ -811,23 +968,48 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
         ),
       splitTerminal: (ref, surfaceId, terminalId, direction = "horizontal") =>
         set((state) =>
-          userAction(state, scopedThreadKey(ref), (current) => ({
-            ...current,
-            isOpen: true,
-            activeSurfaceId: surfaceId,
-            surfaces: current.surfaces.map((surface) => {
-              if (surface.id !== surfaceId || surface.kind !== "terminal") return surface;
-              const { splitDirection: _splitDirection, ...baseSurface } = surface;
+          userAction(state, scopedThreadKey(ref), (current) => {
+            if (
+              !current.surfaces.some(
+                (surface) => surface.id === surfaceId && surface.kind === "terminal",
+              )
+            )
+              return current;
+            const surface = terminalSurface(terminalId);
+            if (current.surfaces.some((entry) => entry.id === surface.id)) return current;
+            const restored = restoreWorkspaceLayout(
+              current.layout,
+              current.surfaces.map((entry) => entry.id),
+              surfaceId,
+              current.focusedPaneId,
+            );
+            const paneId = randomUUID();
+            // Insert the new terminal beside its source through the workspace split tree.
+            const layout = mapWorkspaceLayout(restored.layout, (node) => {
+              if (node.type !== "pane" || !node.surfaceIds.includes(surfaceId)) return node;
               return {
-                ...baseSurface,
-                terminalIds: surface.terminalIds.includes(terminalId)
-                  ? surface.terminalIds
-                  : [...surface.terminalIds, terminalId],
-                activeTerminalId: terminalId,
-                ...(direction === "vertical" ? { splitDirection: "vertical" as const } : {}),
+                type: "split",
+                id: `split:${paneId}`,
+                direction,
+                ratio: 50,
+                first: node,
+                second: {
+                  type: "pane",
+                  id: paneId,
+                  surfaceIds: [surface.id],
+                  activeSurfaceId: surface.id,
+                },
               };
-            }),
-          })),
+            });
+            return {
+              ...current,
+              isOpen: true,
+              surfaces: [...current.surfaces, surface],
+              layout,
+              focusedPaneId: paneId,
+              activeSurfaceId: surface.id,
+            };
+          }),
         ),
       activateTerminal: (ref, surfaceId, terminalId) =>
         set((state) =>
@@ -916,10 +1098,15 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           closeAction(state, scopedThreadKey(ref), (current) => {
             const surface = current.surfaces.find((entry) => entry.id === surfaceId);
             if (!surface || current.surfaces.length === 1) return current;
+            const paneSurfaces = selectPaneSurfaces(current, surfaceId);
             return {
               ...current,
               isOpen: true,
-              surfaces: [surface],
+              surfaces: current.surfaces.filter(
+                (entry) =>
+                  entry.id === surfaceId ||
+                  !paneSurfaces.some((surface) => surface.id === entry.id),
+              ),
               activeSurfaceId: surface.id,
             };
           }),
@@ -929,7 +1116,10 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
           closeAction(state, scopedThreadKey(ref), (current) => {
             const index = current.surfaces.findIndex((surface) => surface.id === surfaceId);
             if (index < 0 || index === current.surfaces.length - 1) return current;
-            const surfaces = current.surfaces.slice(0, index + 1);
+            const paneSurfaces = selectPaneSurfaces(current, surfaceId);
+            const paneIndex = paneSurfaces.findIndex((surface) => surface.id === surfaceId);
+            const removed = new Set(paneSurfaces.slice(paneIndex + 1).map((surface) => surface.id));
+            const surfaces = current.surfaces.filter((surface) => !removed.has(surface.id));
             const activeStillExists = surfaces.some(
               (surface) => surface.id === current.activeSurfaceId,
             );
@@ -948,6 +1138,147 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
               : { ...current, isOpen: false, surfaces: [], activeSurfaceId: null },
           ),
         ),
+      splitSurface: (ref, surfaceId, direction) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            if (!current.surfaces.some((surface) => surface.id === surfaceId)) return current;
+            const restored = restoreWorkspaceLayout(
+              current.layout,
+              current.surfaces.map((surface) => surface.id),
+              surfaceId,
+              current.focusedPaneId,
+            );
+            const paneId = randomUUID();
+            return {
+              ...current,
+              layout: splitWorkspaceSurface(restored.layout, surfaceId, direction, paneId),
+              focusedPaneId: paneId,
+              activeSurfaceId: surfaceId,
+              maximizedPaneId: undefined,
+            };
+          }),
+        ),
+      focusPane: (ref, paneId) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            if (!current.layout || current.focusedPaneId === paneId) return current;
+            const pane = workspacePanes(current.layout).find((entry) => entry.id === paneId);
+            if (!pane) return current;
+            return {
+              ...current,
+              focusedPaneId: pane.id,
+              activeSurfaceId: pane.activeSurfaceId,
+              maximizedPaneId: current.maximizedPaneId ? pane.id : undefined,
+            };
+          }),
+        ),
+      focusAdjacentPane: (ref, direction, moveTab = false) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            if (!current.layout || !current.focusedPaneId) return current;
+            const target = adjacentWorkspacePane(current.layout, current.focusedPaneId, direction);
+            if (!target) return current;
+            const surfaceId = current.activeSurfaceId;
+            if (!moveTab || !surfaceId)
+              return {
+                ...current,
+                focusedPaneId: target.id,
+                activeSurfaceId: target.activeSurfaceId,
+                maximizedPaneId: current.maximizedPaneId ? target.id : undefined,
+              };
+            const layout = mapWorkspaceLayout(current.layout, (node) => {
+              if (node.type !== "pane") return node;
+              if (node.id === target.id)
+                return {
+                  ...node,
+                  surfaceIds: [...node.surfaceIds, surfaceId],
+                  activeSurfaceId: surfaceId,
+                };
+              const ids = node.surfaceIds.filter((id) => id !== surfaceId);
+              let selected = node.activeSurfaceId;
+              if (selected === surfaceId) selected = ids[0] ?? null;
+              return { ...node, surfaceIds: ids, activeSurfaceId: selected };
+            });
+            return {
+              ...current,
+              layout,
+              focusedPaneId: target.id,
+              maximizedPaneId: current.maximizedPaneId ? target.id : undefined,
+            };
+          }),
+        ),
+      resizeSplit: (ref, splitId, ratio) =>
+        set((state) =>
+          automaticUpdate(state, scopedThreadKey(ref), (current) => {
+            if (!current.layout || !Number.isFinite(ratio)) return current;
+            return {
+              ...current,
+              layout: mapWorkspaceLayout(current.layout, (node) => {
+                if (node.type !== "split" || node.id !== splitId) return node;
+                return { ...node, ratio };
+              }),
+            };
+          }),
+        ),
+      resizeFocusedPane: (ref, grow) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            if (!current.layout || !current.focusedPaneId) return current;
+            const ancestors: Extract<WorkspaceLayout, { type: "split" }>[] = [];
+            const find = (node: WorkspaceLayout): boolean => {
+              if (node.type === "pane") return node.id === current.focusedPaneId;
+              if (find(node.first) || find(node.second)) {
+                ancestors.push(node);
+                return true;
+              }
+              return false;
+            };
+            find(current.layout);
+            const split = ancestors[0];
+            if (!split) return current;
+            let delta = 5;
+            if (!grow) delta = -delta;
+            if (!workspacePanes(split.first).some((pane) => pane.id === current.focusedPaneId))
+              delta = -delta;
+            return {
+              ...current,
+              layout: mapWorkspaceLayout(current.layout, (node) => {
+                if (node.type !== "split" || node.id !== split.id) return node;
+                return { ...node, ratio: node.ratio + delta };
+              }),
+            };
+          }),
+        ),
+      toggleMaximizedPane: (ref) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => ({
+            ...current,
+            maximizedPaneId: current.maximizedPaneId ? undefined : current.focusedPaneId,
+          })),
+        ),
+      closePane: (ref) =>
+        set((state) =>
+          userAction(state, scopedThreadKey(ref), (current) => {
+            if (!current.layout || !current.focusedPaneId || current.layout.type === "pane")
+              return current;
+            const panes = workspacePanes(current.layout);
+            const source = panes.find((pane) => pane.id === current.focusedPaneId);
+            if (!source) return current;
+            const layout = removeWorkspacePane(current.layout, source.id);
+            const target = workspacePanes(layout)[0]!;
+            // Closing a pane gathers its tabs into its neighbor without terminating sessions.
+            return {
+              ...current,
+              layout: mapWorkspaceLayout(layout, (node) => {
+                if (node.type !== "pane" || node.id !== target.id) return node;
+                return { ...node, surfaceIds: [...node.surfaceIds, ...source.surfaceIds] };
+              }),
+              focusedPaneId: target.id,
+              activeSurfaceId: target.activeSurfaceId,
+              maximizedPaneId: undefined,
+            };
+          }),
+        ),
       moveSurface: (ref, surfaceId, toIndex) =>
         set((state) =>
           updateThread(state, scopedThreadKey(ref), (current) => {
@@ -955,7 +1286,18 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             if (fromIndex < 0 || fromIndex === toIndex) return current;
             const surfaces = [...current.surfaces];
             surfaces.splice(toIndex, 0, ...surfaces.splice(fromIndex, 1));
-            return { ...current, surfaces };
+            let layout = current.layout;
+            if (layout)
+              layout = mapWorkspaceLayout(layout, (node) => {
+                if (node.type !== "pane") return node;
+                return {
+                  ...node,
+                  surfaceIds: surfaces
+                    .filter((surface) => node.surfaceIds.includes(surface.id))
+                    .map((surface) => surface.id),
+                };
+              });
+            return { ...current, surfaces, ...(layout ? { layout } : {}) };
           }),
         ),
       reconcileBrowserSurfaces: (ref, tabIds, hiddenTabIds) =>
@@ -1146,6 +1488,7 @@ useRightPanelStore.subscribe((next, previous) => {
     ];
     for (const surface of closedInOrder) {
       if (
+        (surface.kind === "chat" && "threadId" in surface) ||
         surface.kind === "terminal" ||
         (surface.kind === "preview" && surface.resourceId !== null)
       )
@@ -1161,6 +1504,19 @@ export function selectThreadRightPanelState(
 ): ThreadRightPanelState {
   if (!ref) return EMPTY_THREAD_STATE;
   return byThreadKey[scopedThreadKey(ref)] ?? EMPTY_THREAD_STATE;
+}
+
+export function selectPaneSurfaces(
+  state: ThreadRightPanelState,
+  surfaceId: string | null = state.activeSurfaceId,
+): readonly RightPanelSurface[] {
+  if (!state.layout) return state.surfaces;
+  const panes = workspacePanes(state.layout);
+  const pane =
+    panes.find((entry) => entry.surfaceIds.includes(surfaceId ?? "")) ??
+    panes.find((entry) => entry.id === state.focusedPaneId);
+  if (!pane) return state.surfaces;
+  return pane.surfaceIds.flatMap((id) => state.surfaces.filter((surface) => surface.id === id));
 }
 
 export function selectThreadPanelVisibility(

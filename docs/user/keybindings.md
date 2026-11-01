@@ -5,7 +5,32 @@ also lists the command IDs and defaults available in your version.
 
 ## Workspace tabs
 
-Use `ctrl+1` through `ctrl+9` to select the first nine tabs in their current order.
+Use `ctrl+1` through `ctrl+9` to select the first nine tabs in the focused pane.
+
+Use the split shortcuts below to move the active tab into a resizable pane. Layouts are saved per conversation. Closing a pane gathers its
+tabs into a neighboring pane without ending terminal sessions.
+
+Configure these shortcuts in **Settings → Keybindings → Tabs & Layout**:
+
+| Action                                  | Shortcut                          |
+| --------------------------------------- | --------------------------------- |
+| New Side Chat                           | `ctrl+alt+n`                      |
+| Split tab right / below                 | `ctrl+alt+s` / `ctrl+alt+shift+s` |
+| Focus an adjacent pane                  | `ctrl+alt+Arrow`                  |
+| Move the active tab to an adjacent pane | `ctrl+alt+shift+Arrow`            |
+| Grow / shrink the focused pane          | `ctrl+alt+=` / `ctrl+alt+-`       |
+| Maximize / restore the focused pane     | `ctrl+alt+m`                      |
+| Close the focused pane                  | `ctrl+alt+w`                      |
+
+Choose **Side Chat** in the tab surface list to open a temporary conversation
+with background context from the main chat. It starts with no visible messages.
+The context captures the opening request, latest plan, workspace, and recent
+messages when the tab opens; later changes to the main chat are not included.
+Each Side Chat has independent messages and a draft, and survives tab switching
+and reloads. Closing its tab deletes the temporary conversation and stops its
+activity. You can create multiple Side Chats. The **Chat** option appears only when the main chat tab is closed.
+
+At narrow widths, select a pane using the pane switcher.
 
 ## Composer controls
 

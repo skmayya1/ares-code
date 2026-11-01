@@ -2,6 +2,7 @@ import { scopeThreadRef } from "@t3tools/client-runtime/environment";
 import { type EnvironmentId, RunId, ThreadId } from "@t3tools/contracts";
 import { beforeEach, describe, expect, it } from "vite-plus/test";
 
+import { workspacePanes } from "./workspaceLayout";
 import { useClosedViewStore } from "./closedViewStore";
 import { reopenClosedView } from "./reopenClosedView";
 import {
@@ -10,6 +11,7 @@ import {
   pullRequestSurfaceId,
   selectActiveRightPanel,
   selectActiveRightPanelSurface,
+  selectPaneSurfaces,
   selectThreadPanelVisibility,
   selectThreadRightPanelState,
   useRightPanelStore,
@@ -39,6 +41,32 @@ async function reloadRightPanelStore() {
 }
 
 describe("rightPanelStore", () => {
+  it("preserves independent side chats across reload and pane moves until closed", async () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "chat");
+    store.openSideChat(refA, ThreadId.make("fork-1"), "main context snapshot");
+    store.openSideChat(refA, ThreadId.make("fork-2"));
+    store.splitSurface(refA, "side-chat:fork-2", "horizontal");
+    store.closePane(refA);
+    await reloadRightPanelStore();
+    const state = () =>
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(state().surfaces).toEqual([
+      { id: "chat", kind: "chat" },
+      {
+        id: "side-chat:fork-1",
+        kind: "chat",
+        threadId: "fork-1",
+        title: "Side Chat 1",
+        context: "main context snapshot",
+      },
+      { id: "side-chat:fork-2", kind: "chat", threadId: "fork-2", title: "Side Chat 2" },
+    ]);
+    store.closeSurface(refA, "side-chat:fork-1");
+    expect(state().surfaces.map((surface) => surface.id)).toEqual(["chat", "side-chat:fork-2"]);
+    expect(useClosedViewStore.getState().entries).toEqual([]);
+  });
+
   it("keeps one chat tab per thread through reload and reopen", async () => {
     const store = useRightPanelStore.getState();
     store.open(refA, "chat");
@@ -1129,27 +1157,31 @@ describe("rightPanelStore", () => {
     ).toEqual([]);
   });
 
-  it("tracks split panes and the active pane within a terminal surface", () => {
+  it("places split terminals in separate workspace panes", () => {
     useRightPanelStore.getState().openTerminal(refA, "term-1");
     useRightPanelStore.getState().splitTerminal(refA, "terminal:term-1", "term-2");
 
+    const split = selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+    expect(split.layout).toMatchObject({ type: "split", direction: "horizontal" });
+    expect(workspacePanes(split.layout!).map((pane) => pane.surfaceIds)).toEqual([
+      ["terminal:term-1"],
+      ["terminal:term-2"],
+    ]);
     expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
-      id: "terminal:term-1",
+      id: "terminal:term-2",
       kind: "terminal",
-      resourceId: "term-1",
-      terminalIds: ["term-1", "term-2"],
-      activeTerminalId: "term-2",
-    });
-
-    useRightPanelStore.getState().activateTerminal(refA, "terminal:term-1", "term-1");
-    useRightPanelStore.getState().closeTerminal(refA, "terminal:term-1", "term-1");
-    expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)).toEqual({
-      id: "terminal:term-1",
-      kind: "terminal",
-      resourceId: "term-1",
+      resourceId: "term-2",
       terminalIds: ["term-2"],
       activeTerminalId: "term-2",
     });
+    useRightPanelStore.getState().activateTerminal(refA, "terminal:term-1", "term-1");
+    useRightPanelStore.getState().closeTerminal(refA, "terminal:term-1", "term-1");
+    expect(selectActiveRightPanelSurface(useRightPanelStore.getState().byThreadKey, refA)?.id).toBe(
+      "terminal:term-2",
+    );
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA).layout?.type,
+    ).toBe("pane");
   });
 
   it("closing the final terminal pane removes its surface and closes the panel", () => {
@@ -1251,5 +1283,105 @@ describe("rightPanelStore", () => {
     store.reconcileBrowserSurfaces(refA, ["tab-a", "tab-b"]);
     expect(surfaceIds()).toEqual(["browser:tab-a", "terminal:term-1", "diff", "browser:tab-b"]);
     expect(store.getUserActionRevision(refA)).toBe(revision);
+  });
+});
+
+describe("workspace pane layout", () => {
+  const read = () => selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
+
+  it("persists nested splits, sizes, selection, and pane-local tab actions", async () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "chat");
+    store.open(refA, "diff");
+    store.open(refA, "files");
+    store.splitSurface(refA, "diff", "horizontal");
+    store.splitSurface(refA, "files", "vertical");
+    let panes = workspacePanes(read().layout!);
+    expect(panes.map((pane) => pane.surfaceIds)).toEqual([["chat"], ["files"], ["diff"]]);
+    store.focusPane(refA, panes[1]!.id);
+    store.openBrowser(refA, "browser-a");
+    expect(workspacePanes(read().layout!)[1]?.surfaceIds).toEqual(["files", "browser:browser-a"]);
+    store.closeSurface(refA, "browser:browser-a");
+    expect(read().activeSurfaceId).toBe("files");
+    if (read().layout?.type !== "split") throw new Error("Expected split");
+    store.resizeSplit(refA, read().layout!.id, 65);
+    await reloadRightPanelStore();
+    expect(read().layout).toMatchObject({ type: "split", ratio: 65 });
+    expect(read().activeSurfaceId).toBe("files");
+    panes = workspacePanes(read().layout!);
+    store.focusPane(refA, panes[2]!.id);
+    store.openBrowser(refA, "browser-b");
+    expect(selectPaneSurfaces(read()).map((surface) => surface.id)).toEqual([
+      "diff",
+      "browser:browser-b",
+    ]);
+    store.closeOtherSurfaces(refA, "browser:browser-b");
+    expect(read().surfaces.map((surface) => surface.id)).toEqual([
+      "chat",
+      "files",
+      "browser:browser-b",
+    ]);
+    store.closeSurface(refA, "browser:browser-b");
+    expect(workspacePanes(read().layout!).map((pane) => pane.surfaceIds)).toEqual([
+      ["chat"],
+      ["files"],
+    ]);
+  });
+
+  it("keeps an empty launcher after splitting the sole tab and gathers tabs when closing a pane", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "chat");
+    store.splitSurface(refA, "chat", "horizontal");
+    expect(workspacePanes(read().layout!).map((pane) => pane.surfaceIds)).toEqual([[], ["chat"]]);
+    store.focusAdjacentPane(refA, "left");
+    expect(read().activeSurfaceId).toBeNull();
+    store.open(refA, "diff");
+    expect(workspacePanes(read().layout!).map((pane) => pane.surfaceIds)).toEqual([
+      ["diff"],
+      ["chat"],
+    ]);
+    store.focusAdjacentPane(refA, "right", true);
+    expect(workspacePanes(read().layout!).map((pane) => pane.surfaceIds)).toEqual([
+      [],
+      ["chat", "diff"],
+    ]);
+    expect(read().activeSurfaceId).toBe("diff");
+    store.toggleMaximizedPane(refA);
+    expect(read().maximizedPaneId).toBe(read().focusedPaneId);
+    store.closePane(refA);
+    expect(read().layout?.type).toBe("pane");
+    expect(read().surfaces.map((surface) => surface.id)).toEqual(["chat", "diff"]);
+    expect(read().maximizedPaneId).toBeUndefined();
+    store.closePane(refA);
+    expect(read().surfaces).toHaveLength(2);
+  });
+
+  it("migrates old terminal groups to workspace splits without losing sessions", () => {
+    const migrated = migratePersistedRightPanelState({
+      byThreadKey: {
+        "env-1:thread-A": {
+          isOpen: true,
+          activeSurfaceId: "terminal:a",
+          surfaces: [
+            { id: "chat", kind: "chat" },
+            {
+              id: "terminal:a",
+              kind: "terminal",
+              resourceId: "a",
+              terminalIds: ["a", "b"],
+              activeTerminalId: "b",
+              splitDirection: "vertical",
+            },
+          ],
+        },
+      },
+    });
+    const state = selectThreadRightPanelState(migrated.byThreadKey, refA);
+    expect(state.activeSurfaceId).toBe("terminal:b");
+    expect(state.layout).toMatchObject({ type: "split", direction: "vertical" });
+    expect(workspacePanes(state.layout!).map((pane) => pane.surfaceIds)).toEqual([
+      ["chat", "terminal:a"],
+      ["terminal:b"],
+    ]);
   });
 });

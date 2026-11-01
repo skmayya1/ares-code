@@ -17,9 +17,11 @@ import { type ThreadPanelPresentation } from "../../rightPanelLayout";
 import {
   selectActiveRightPanel,
   selectThreadPanelOpen,
+  selectThreadRightPanelState,
   type RightPanelSurface,
   useRightPanelStore,
 } from "../../rightPanelStore";
+import { workspacePanes } from "../../workspaceLayout";
 import { requestWorkspaceContentFocus, requestWorkspaceFocus } from "../../lib/workspaceFocus";
 import { setActivePreviewTab } from "../../previewStateStore";
 import { BrowserSettingsReadError } from "../../browser/openFileInPreview";
@@ -138,7 +140,15 @@ export function useRightPanelActions(input: RightPanelActionsInput) {
   };
   const addDiffSurfaceStable = useStableCallback(addDiffSurface);
   const openChangesFromThreadPanel = () => {
+    if (!activeThreadRef || !isServerThread || !isGitRepo) return;
     addDiffSurface();
+    const store = useRightPanelStore.getState();
+    const state = selectThreadRightPanelState(store.byThreadKey, activeThreadRef);
+    if (!state.layout) return;
+    const diffPane = workspacePanes(state.layout).find((pane) => pane.surfaceIds.includes("diff"));
+    if (diffPane && diffPane.surfaceIds.length > 1) {
+      store.splitSurface(activeThreadRef, "diff", "horizontal");
+    }
   };
   const openChangesFromThreadPanelStable = useStableCallback(openChangesFromThreadPanel);
   const addFilesSurface = () => {

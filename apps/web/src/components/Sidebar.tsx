@@ -318,7 +318,6 @@ const SETTLED_TAIL_INITIAL_COUNT = 10;
 const SETTLED_TAIL_PAGE_COUNT = 25;
 const SETTLED_SHELF_EXPANDED_KEY = "t3code:sidebar:settled-expanded";
 const SNOOZED_SHELF_EXPANDED_KEY = "t3code:sidebar:snoozed-expanded";
-const WORKING_SHELF_EXPANDED_KEY = "t3code:sidebar:working-expanded";
 
 const inboxReturns = createInboxReturnTracker();
 
@@ -439,11 +438,6 @@ function useSidebarThreads(input: {
     false,
     Schema.Boolean,
   );
-  const [workingShelfExpanded, setWorkingShelfExpanded] = useLocalStorage(
-    WORKING_SHELF_EXPANDED_KEY,
-    false,
-    Schema.Boolean,
-  );
   // Shared with the old per-project sidebar, so folders keep their open state.
   const projectExpandedById = useUiStateStore((store) => store.projectExpandedById);
   const setProjectExpanded = useUiStateStore((store) => store.setProjectExpanded);
@@ -499,9 +493,7 @@ function useSidebarThreads(input: {
   const visibleSnoozedThreads = snoozedShelfExpanded
     ? snoozedThreads
     : routeThreadOnly(snoozedThreads, routeRowThreadKey);
-  const visibleWorkingThreads = workingShelfExpanded
-    ? workingThreads
-    : routeThreadOnly(workingThreads, routeRowThreadKey);
+  const visibleWorkingThreads = workingThreads;
   const projectFolders =
     folderGroups === null
       ? null
@@ -523,11 +515,11 @@ function useSidebarThreads(input: {
           };
         });
   const orderedThreads = [
+    ...visibleWorkingThreads,
     ...pinnedThreads,
     ...(projectFolders === null
       ? activeThreads
       : projectFolders.flatMap((folder) => folder.threads)),
-    ...visibleWorkingThreads,
     ...visibleSnoozedThreads,
     ...renderedSettledThreads,
   ];
@@ -565,8 +557,6 @@ function useSidebarThreads(input: {
     toggleSettledShelf: () => setSettledShelfExpanded((value) => !value),
     snoozedShelfExpanded,
     toggleSnoozedShelf: () => setSnoozedShelfExpanded((value) => !value),
-    workingShelfExpanded,
-    toggleWorkingShelf: () => setWorkingShelfExpanded((value) => !value),
     projectFolders,
     toggleProjectFolder: (group: SidebarProjectSnapshot) => {
       const keys = sidebarFolderExpansionKeys(group);
@@ -1257,8 +1247,6 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     toggleSettledShelf,
     snoozedShelfExpanded,
     toggleSnoozedShelf,
-    workingShelfExpanded,
-    toggleWorkingShelf,
     projectFolders,
     toggleProjectFolder,
     renderedSettledThreads,
@@ -1869,17 +1857,18 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
     ) {
       return [];
     }
-    const items: SidebarListItem[] = [{ kind: "marker", marker: "pinned-header" }];
+    const items: SidebarListItem[] = [];
+    if (workingThreads.length > 0) {
+      items.push({ kind: "marker", marker: "working-header" });
+      items.push(...rowsOf(visibleWorkingThreads, "working"));
+    }
+    items.push({ kind: "marker", marker: "pinned-header" });
     const pinnedRows = rowsOf(pinnedThreads, "pinned");
     items.push(...pinnedRows);
     items.push({ kind: "marker", marker: "pinned-divider" });
     const activeRows = rowsOf(activeThreads, "active");
     items.push({ kind: "marker", marker: "active-placeholder" });
     items.push(...activeRows);
-    if (workingThreads.length > 0) {
-      items.push({ kind: "marker", marker: "working-header" });
-      items.push(...rowsOf(visibleWorkingThreads, "working"));
-    }
     if (snoozedThreads.length > 0) {
       items.push({ kind: "marker", marker: "snoozed-header" });
       items.push(...rowsOf(visibleSnoozedThreads, "snoozed"));
@@ -3391,16 +3380,12 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                             break;
                           case "working-header":
                             items.push(
-                              <SidebarSectionHeader
-                                key="working-shelf-header"
+                              <SidebarDragBoundary
+                                key="working-boundary"
                                 marker="working-header"
-                                className="mt-auto"
                                 label="Working"
-                                count={workingThreads.length}
-                                toggle={{
-                                  expanded: workingShelfExpanded,
-                                  onToggle: toggleWorkingShelf,
-                                }}
+                                visible={false}
+                                isDropTarget={false}
                               />,
                             );
                             break;
@@ -3409,7 +3394,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="snoozed-shelf-header"
                                 marker="snoozed-header"
-                                className={cn(workingThreads.length === 0 && "mt-auto")}
+                                className="mt-auto"
                                 label="Snoozed"
                                 count={snoozedThreads.length}
                                 toggle={{
@@ -3424,9 +3409,7 @@ export default function Sidebar({ routeReveal }: { routeReveal: SidebarRouteReve
                               <SidebarSectionHeader
                                 key="settled-shelf-header"
                                 marker="settled-header"
-                                className={cn(
-                                  workingThreads.length + snoozedThreads.length === 0 && "mt-auto",
-                                )}
+                                className={cn(snoozedThreads.length === 0 && "mt-auto")}
                                 label="Settled"
                                 count={settledCount}
                                 dragging={from !== null}

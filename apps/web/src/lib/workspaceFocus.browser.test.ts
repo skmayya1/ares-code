@@ -52,6 +52,22 @@ describe("workspace area focus", () => {
     expect(document.activeElement).toBe(panel.button);
   });
 
+  it("targets the focused pane when multiple workspace panels are visible", () => {
+    using fixture = setup();
+    const first = fixture.area("panel", 4);
+    const second = fixture.area("panel", 4);
+    const pane = document.createElement("div");
+    pane.dataset.workspacePaneFocused = "true";
+    second.element.before(pane);
+    pane.append(second.element);
+    fixture.controller.focus("panel");
+    expect(document.activeElement).toBe(second.button);
+    pane.dataset.workspacePaneFocused = "false";
+    first.element.dataset.workspacePaneFocused = "true";
+    fixture.controller.focus("panel");
+    expect(document.activeElement).toBe(first.button);
+  });
+
   it("skips hidden, inert, and maximized-away areas", () => {
     using fixture = setup();
     const sidebar = fixture.area("sidebar", 0);

@@ -17,21 +17,25 @@ function sameInput(left: TimelineEntriesInput, right: TimelineEntriesInput): boo
   );
 }
 
+function createTimelineEntriesProjector() {
+  let previous: { threadKey: string | null; projection: TimelineEntriesProjection } | null = null;
+  return (threadKey: string | null, input: TimelineEntriesInput) => {
+    if (previous?.threadKey === threadKey && sameInput(previous.projection.input, input)) {
+      return previous.projection.entries;
+    }
+    const projection = deriveTimelineEntriesFromVisibleTurnItemsWithState(
+      input,
+      previous?.threadKey === threadKey ? previous.projection : null,
+    );
+    previous = { threadKey, projection };
+    return projection.entries;
+  };
+}
+
 export function useIncrementalTimelineEntries(
   threadKey: string | null,
   input: TimelineEntriesInput,
 ): TimelineEntriesProjection["entries"] {
-  const [state, setState] = useState(() => ({
-    threadKey,
-    projection: deriveTimelineEntriesFromVisibleTurnItemsWithState(input),
-  }));
-  if (state.threadKey === threadKey && sameInput(state.projection.input, input)) {
-    return state.projection.entries;
-  }
-  const projection = deriveTimelineEntriesFromVisibleTurnItemsWithState(
-    input,
-    state.threadKey === threadKey ? state.projection : null,
-  );
-  setState({ threadKey, projection });
-  return projection.entries;
+  const [project] = useState(createTimelineEntriesProjector);
+  return project(threadKey, input);
 }

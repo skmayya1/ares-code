@@ -180,7 +180,11 @@ export function createWorkspaceFocusController(doc: Document) {
           ) ??
           areas.find((element) => element.dataset.workspaceArea === "conversation") ??
           areas.find((element) => element.dataset.workspaceArea === "panel"))
-        : areas.find((element) => element.dataset.workspaceArea === name);
+        : (areas.find(
+            (element) =>
+              element.dataset.workspaceArea === name &&
+              element.closest('[data-workspace-pane-focused="true"]'),
+          ) ?? areas.find((element) => element.dataset.workspaceArea === name));
     if (!area) return false;
     const surface = area.querySelector("[data-right-panel-surface-content]");
     // A lazy surface's Suspense fallback is empty. Wait for its content instead

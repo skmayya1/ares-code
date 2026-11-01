@@ -33,12 +33,10 @@ it("reopens the existing panel and selects a running terminal in its split", () 
     selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, threadRef),
   ).toMatchObject({
     isOpen: true,
-    activeSurfaceId: surfaceId,
+    activeSurfaceId: "terminal:setup-install",
     surfaces: [
-      {
-        terminalIds: ["terminal-1", "setup-install"],
-        activeTerminalId: "setup-install",
-      },
+      { terminalIds: ["terminal-1"], activeTerminalId: "terminal-1" },
+      { terminalIds: ["setup-install"], activeTerminalId: "setup-install" },
     ],
   });
   expect(
@@ -49,10 +47,12 @@ it("reopens the existing panel and selects a running terminal in its split", () 
   ).toEqual([]);
 });
 
-it("reveals terminals in their own environment without changing another environment's drawer", () => {
+it("reveals terminals in their own environment without changing another environment's workspace", () => {
   revealThreadTerminal(threadRef, "default");
   revealThreadTerminal(remoteRef, "setup-install");
-  const state = useTerminalUiStateStore.getState().terminalUiStateByThreadKey;
-  expect(selectThreadTerminalUiState(state, threadRef).terminalIds).toEqual(["default"]);
-  expect(selectThreadTerminalUiState(state, remoteRef).terminalIds).toEqual(["setup-install"]);
+  const state = useRightPanelStore.getState().byThreadKey;
+  expect(selectThreadRightPanelState(state, threadRef).activeSurfaceId).toBe("terminal:default");
+  expect(selectThreadRightPanelState(state, remoteRef).activeSurfaceId).toBe(
+    "terminal:setup-install",
+  );
 });

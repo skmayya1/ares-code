@@ -305,10 +305,19 @@ function formatEnvelopeEntry(
 
 export function projectComposerContextForProvider(input: {
   text: string;
+  sideChatContext?: string | undefined;
   records: ReadonlyArray<ComposerContextRecord>;
 }): string {
+  let snapshot = "";
+  if (input.sideChatContext) {
+    const escaped = input.sideChatContext
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+    snapshot = `\n\n<t3_side_chat_context>\nMain conversation background, captured when this side chat opened:\n${escaped}\n</t3_side_chat_context>`;
+  }
   const occurrences = collectComposerContextReferences(input.text);
-  if (occurrences.length === 0) return input.text;
+  if (occurrences.length === 0) return input.text + snapshot;
   const recordsById = new Map<ComposerContextId, ComposerContextRecord | undefined>();
   for (const record of input.records) {
     recordsById.set(record.contextId, recordsById.has(record.contextId) ? undefined : record);
@@ -333,8 +342,8 @@ export function projectComposerContextForProvider(input: {
     );
     entries.push(entry);
   }
-  if (entries.length === 0) return body;
-  return `${body}\n\n<${CONTEXT_ENVELOPE_TAG} version="1">\n${entries.join("\n")}\n</${CONTEXT_ENVELOPE_TAG}>`;
+  if (entries.length === 0) return body + snapshot;
+  return `${body}\n\n<${CONTEXT_ENVELOPE_TAG} version="1">\n${entries.join("\n")}\n</${CONTEXT_ENVELOPE_TAG}>${snapshot}`;
 }
 
 // An agent reads threads on its own machine and on those it links to, even when a draft

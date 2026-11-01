@@ -99,6 +99,7 @@ interface Props {
   tabId?: string | null;
   configuredUrls?: ReadonlyArray<string> | undefined;
   visible: boolean;
+  shortcutsEnabled?: boolean | undefined;
   onSendAnnotation?: (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
@@ -143,6 +144,7 @@ export function PreviewView({
   tabId: requestedTabId,
   configuredUrls,
   visible,
+  shortcutsEnabled = true,
   onSendAnnotation,
 }: Props) {
   const urlInputRef = useRef<HTMLInputElement | null>(null);
@@ -838,9 +840,9 @@ export function PreviewView({
   );
   // oxlint-disable-next-line t3code/no-unreasoned-state-sync -- subscribes to preview actions while the view is visible
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !shortcutsEnabled) return;
     return subscribePreviewAction((action) => onPreviewAction(action));
-  }, [visible]);
+  }, [visible, shortcutsEnabled]);
 
   return (
     <div
@@ -973,7 +975,7 @@ export function PreviewView({
           ) : (
             <div className="flex h-full items-center justify-center p-8 text-center">
               <p className="max-w-sm text-sm text-muted-foreground">
-                This tab is open in the T3 Code desktop app.
+                This tab is open in the Ares desktop app.
               </p>
             </div>
           )

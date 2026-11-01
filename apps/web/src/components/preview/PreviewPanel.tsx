@@ -17,6 +17,7 @@ interface Props {
   tabId?: string | null;
   configuredUrls?: ReadonlyArray<string> | undefined;
   visible: boolean;
+  shortcutsEnabled?: boolean | undefined;
   onSendAnnotation?: (
     annotation: PreviewAnnotationPayload,
     image: ComposerImageAttachment | null,
@@ -29,6 +30,7 @@ export function PreviewPanel({
   tabId,
   configuredUrls,
   visible,
+  shortcutsEnabled,
   onSendAnnotation,
 }: Props) {
   const available = usePreviewAvailable(threadRef.environmentId);
@@ -39,7 +41,7 @@ export function PreviewPanel({
         <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-8 text-center">
           <p className="max-w-sm text-sm text-muted-foreground">
             {canOperatePreview
-              ? "Preview is only available in the T3 Code desktop app."
+              ? "Preview is only available in the Ares desktop app."
               : "Pair this client again with preview access to control browser previews."}
           </p>
         </div>
@@ -54,6 +56,7 @@ export function PreviewPanel({
         {...(tabId !== undefined ? { tabId } : {})}
         configuredUrls={configuredUrls}
         visible={visible}
+        shortcutsEnabled={shortcutsEnabled}
         {...(onSendAnnotation ? { onSendAnnotation } : {})}
       />
     </PreviewPanelShell>

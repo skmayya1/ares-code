@@ -760,6 +760,7 @@ export const layer: Layer.Layer<
       const userText = projectComposerContextForProvider({
         text: message.text,
         records: message.context?.records ?? [],
+        sideChatContext: message.context?.sideChatContext,
       });
       // Codex and Claude parse /goal from the prompt, so it goes verbatim and history waits a turn.
       const goalDriver = session.driver === "codex" || session.driver === "claudeAgent";

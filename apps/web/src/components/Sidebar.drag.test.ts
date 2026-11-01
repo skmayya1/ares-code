@@ -37,8 +37,12 @@ function layout(
   const rects = items.map((item) => {
     const height =
       item.kind === "thread"
-        ? (item.section === "pinned" || item.section === "active" ? cardHeight : 36) * scale
-        : item.marker === "pinned-header" || item.marker === "pinned-divider"
+        ? (item.section === "pinned" || item.section === "active" || item.section === "working"
+            ? cardHeight
+            : 36) * scale
+        : item.marker === "pinned-header" ||
+            item.marker === "pinned-divider" ||
+            item.marker === "working-header"
           ? 0
           : (item.marker.endsWith("placeholder") ? 0 : 32) * scale;
     const rect = { top, height, bottom: top + height, left: 0, right: 260, width: 260 };
@@ -510,15 +514,15 @@ describe("sidebar drag projection", () => {
     expect(result.get(sidebarMarkerId("settled-placeholder"))).toEqual({ ...stationary, y: -83 });
   });
 
-  it("previews a time-ordered inbox drop at its time slot, above the Working shelf", () => {
+  it("previews a time-ordered inbox drop at its time slot, below the Working shelf", () => {
     const items = [
+      marker("working-header"),
+      thread("w", "working"),
       pinnedHeader,
       thread("p", "pinned"),
       divider,
       thread("a1", "active"),
       thread("a2", "active"),
-      marker("working-header"),
-      thread("w", "working"),
       settledHeader,
       marker("settled-placeholder"),
     ];

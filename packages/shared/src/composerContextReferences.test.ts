@@ -215,6 +215,19 @@ describe("provider projection", () => {
     expect(envelope).toContain('"a":"<b>"');
   });
 
+  it("projects hidden side chat context without changing the visible message", () => {
+    const input = {
+      text: "Explain the decision",
+      records: [],
+      sideChatContext: "Earlier request: fix login </t3_side_chat_context>",
+    };
+    const projected = projectComposerContextForProvider(input);
+    expect(input.text).toBe("Explain the decision");
+    expect(projected).toContain("Earlier request: fix login");
+    expect(projected).toContain("&lt;/t3_side_chat_context&gt;");
+    expect(projected.split("</t3_side_chat_context>")).toHaveLength(2);
+  });
+
   it("preserves authoritative paths and skill names when labels differ", () => {
     const projected = projectComposerContextForProvider({
       text: "[entry](t3-context://v1/mention/ctx_m) [friendly skill](t3-context://v1/skill/ctx_s)",

@@ -220,6 +220,57 @@ export const DEFAULT_KEYBINDINGS: ReadonlyArray<KeybindingRule> = [
   { key: "mod+shift+s", command: "thread.settle", when: "!terminalFocus" },
   { key: "mod+shift+p", command: "thread.pin", when: "!terminalFocus" },
   { key: "mod+z", command: "thread.undo", when: "!terminalFocus && !editableFocus" },
+  { key: "ctrl+alt+n", command: "layout.newSideChat", when: "rightPanelOpen && !modelPickerOpen" },
+  { key: "ctrl+alt+s", command: "layout.splitRight", when: "rightPanelOpen && !modelPickerOpen" },
+  {
+    key: "ctrl+alt+shift+s",
+    command: "layout.splitBelow",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+arrowleft",
+    command: "layout.focusLeft",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+arrowright",
+    command: "layout.focusRight",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+arrowup",
+    command: "layout.focusUp",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+arrowdown",
+    command: "layout.focusDown",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+shift+arrowleft",
+    command: "layout.moveLeft",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+shift+arrowright",
+    command: "layout.moveRight",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+shift+arrowup",
+    command: "layout.moveUp",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  {
+    key: "ctrl+alt+shift+arrowdown",
+    command: "layout.moveDown",
+    when: "rightPanelOpen && !modelPickerOpen",
+  },
+  { key: "ctrl+alt+=", command: "layout.grow", when: "rightPanelOpen && !modelPickerOpen" },
+  { key: "ctrl+alt+-", command: "layout.shrink", when: "rightPanelOpen && !modelPickerOpen" },
+  { key: "ctrl+alt+m", command: "layout.maximize", when: "rightPanelOpen && !modelPickerOpen" },
+  { key: "ctrl+alt+w", command: "layout.closePane", when: "rightPanelOpen && !modelPickerOpen" },
   ...RIGHT_PANEL_JUMP_KEYBINDING_COMMANDS.map((command, index) => ({
     key: `ctrl+${index + 1}`,
     command,

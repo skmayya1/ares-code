@@ -202,10 +202,11 @@ export interface KeybindingGroup {
 }
 
 const KEYBINDING_GROUPS = [
+  { id: "tabs-layout", title: "Tabs & Layout", prefixes: ["rightPanel", "layout"] },
   {
     id: "navigation",
     title: "Navigation",
-    prefixes: ["sidebar", "rightPanel", "commandPalette", "filePicker", "projectSearch", "editor"],
+    prefixes: ["sidebar", "commandPalette", "filePicker", "projectSearch", "editor"],
   },
   { id: "threads", title: "Threads", prefixes: ["thread", "chat", "pullRequest"] },
   { id: "composer", title: "Composer", prefixes: ["composer", "modelPicker"] },

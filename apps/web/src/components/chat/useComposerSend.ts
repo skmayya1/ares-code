@@ -160,6 +160,7 @@ type UsageLimitsPanel = ReturnType<typeof useUsageLimitsPanel>;
 type TimelineFollow = ReturnType<typeof useTimelineFollow>;
 
 interface ComposerSendInput {
+  readonly sideChatContext?: string | undefined;
   readonly environmentId: EnvironmentId;
   readonly routeThreadKey: string;
   readonly currentRouteThreadKeyRef: { readonly current: string | null };
@@ -822,8 +823,8 @@ export function useComposerSend(input: ComposerSendInput) {
     // Records bind attachments by the id each side knows: the local id for the optimistic
     // row, the upload id (or local id on the data-URL path) on the wire; the server
     // rebinds them to the persisted id.
-    const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) =>
-      buildMessageContext({
+    const buildOutgoingMessageContext = (attachmentIds: ReadonlyArray<string>) => {
+      const context = buildMessageContext({
         terminalContexts: composerTerminalContextsSnapshot,
         reviewComments: composerReviewCommentsSnapshot,
         previewAnnotations: composerPreviewAnnotationsSnapshot,
@@ -834,6 +835,16 @@ export function useComposerSend(input: ComposerSendInput) {
           attachmentId: attachmentIds[index] ?? attachment.id,
         })),
       });
+      if (input.sideChatContext !== undefined) {
+        return {
+          version: 1 as const,
+          records: [],
+          ...context,
+          sideChatContext: input.sideChatContext,
+        };
+      }
+      return context;
+    };
     const outgoingMessageContext = buildOutgoingMessageContext(
       composerAttachmentsSnapshot.map((attachment) => attachment.id),
     );

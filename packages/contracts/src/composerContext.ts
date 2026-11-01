@@ -282,6 +282,7 @@ export type GuestMessageAttribution = typeof GuestMessageAttribution.Type;
 
 /** Structured context riding on a user message. Undecodable records are dropped, not fatal. */
 export const OrchestrationMessageContext = Schema.Struct({
+  sideChatContext: Schema.optional(Schema.String.check(Schema.isMaxLength(32_000))),
   version: Schema.Literal(1),
   guest: Schema.optional(GuestMessageAttribution),
   records: Schema.Array(Schema.Unknown)
