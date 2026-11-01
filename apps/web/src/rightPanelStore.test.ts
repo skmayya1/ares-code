@@ -1289,6 +1289,25 @@ describe("rightPanelStore", () => {
 describe("workspace pane layout", () => {
   const read = () => selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, refA);
 
+  it("opens changes beside chat and reuses the diff pane", () => {
+    const store = useRightPanelStore.getState();
+    store.open(refA, "chat");
+    store.openDiffSplit(refA);
+    const layout = read().layout!;
+    expect(workspacePanes(layout).map((pane) => pane.surfaceIds)).toEqual([["chat"], ["diff"]]);
+    expect(workspacePanes(layout).map((pane) => pane.activeSurfaceId)).toEqual(["chat", "diff"]);
+    store.focusPane(refA, workspacePanes(layout)[0]!.id);
+    store.openDiffSplit(refA);
+    expect(read().layout).toEqual(layout);
+    expect(read().activeSurfaceId).toBe("diff");
+    store.closeSurface(refA, "diff");
+    store.openDiffSplit(refA);
+    expect(workspacePanes(read().layout!).map((pane) => pane.surfaceIds)).toEqual([
+      ["chat"],
+      ["diff"],
+    ]);
+  });
+
   it("persists nested splits, sizes, selection, and pane-local tab actions", async () => {
     const store = useRightPanelStore.getState();
     store.open(refA, "chat");

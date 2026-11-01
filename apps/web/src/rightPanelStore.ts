@@ -185,6 +185,7 @@ interface RightPanelStoreState {
   closeOtherSurfaces: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeSurfacesToRight: (ref: ScopedThreadRef, surfaceId: string) => void;
   closeAllSurfaces: (ref: ScopedThreadRef) => void;
+  openDiffSplit: (ref: ScopedThreadRef) => void;
   splitSurface: (ref: ScopedThreadRef, surfaceId: string, direction: SplitDirection) => void;
   focusPane: (ref: ScopedThreadRef, paneId: string) => void;
   focusAdjacentPane: (ref: ScopedThreadRef, direction: PaneDirection, moveTab?: boolean) => void;
@@ -790,6 +791,17 @@ export const useRightPanelStore = create<RightPanelStoreState>()(
             return upsertSurface(current, singletonSurface(kind));
           }),
         ),
+      openDiffSplit: (ref) => {
+        get().open(ref, "diff");
+        const state = selectThreadRightPanelState(get().byThreadKey, ref);
+        if (state.layout) {
+          const pane = workspacePanes(state.layout).find((entry) =>
+            entry.surfaceIds.includes("diff"),
+          );
+          if (pane?.surfaceIds.length === 1) return;
+        }
+        get().splitSurface(ref, "diff", "horizontal");
+      },
       openSideChat: (ref, threadId, context) =>
         set((state) =>
           userAction(state, scopedThreadKey(ref), (current) => {
